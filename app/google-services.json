@@ -1,0 +1,73 @@
+{
+  "project_info": {
+    "project_number": "375083689388",
+    "firebase_url": "https://trans-sunset-231415.firebaseio.com",
+    "project_id": "trans-sunset-231415",
+    "storage_bucket": "trans-sunset-231415.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375083689388:android:058566c13926d1a4",
+        "android_client_info": {
+          "package_name": "com.specknet.orientandroid"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "375083689388-3at7f31j4lcc98oriu56acd5amtecl5a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-2lILfdfl6x_3oU2eCBIcvRu1R6cJpTc"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375083689388:android:d2dee6c94829bd77",
+        "android_client_info": {
+          "package_name": "iot.ssc"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "375083689388-3at7f31j4lcc98oriu56acd5amtecl5a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-2lILfdfl6x_3oU2eCBIcvRu1R6cJpTc"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
