@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.AdapterView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,8 +13,11 @@ import com.polidea.rxandroidble2.RxBleDevice;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,8 +27,8 @@ public class MainActivity extends Activity {
     private FirebaseFirestore mFirestore = FirebaseFirestore.getInstance();
     Map<String, Integer> readings = new HashMap<>();
 
-    //private static String ORIENT_BLE_ADDRESS = "D3:06:E2:FD:ED:04"; //Tizzy's board 2nd semester
-    private static String ORIENT_BLE_ADDRESS = "C9:22:1F:AA:18:54";
+    private static String ORIENT_BLE_ADDRESS = "D3:06:E2:FD:ED:04"; //Tizzy's board 2nd semester
+    //private static String ORIENT_BLE_ADDRESS = "C9:22:1F:AA:18:54";
 
     //characteristics for the board
     private static final String ORIENT_QUAT_CHARACTERISTIC = "0000a001-0000-1000-8000-00805f9b34fb";
@@ -49,11 +50,13 @@ public class MainActivity extends Activity {
     int peopleCountBoard = 0;
     int resetNeeded = 0;
     int pirTriggered = 2;
+    int tofTriggered = 2;
+    List<Integer> tenTOFreadings;
     private int counter = 0;
     private boolean logging = false;
 
     private Context ctx;
-    private TextView captureOccupancyNumberView;
+    private TextView occupancyNumberView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +64,9 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         ctx = this;
 
-        captureOccupancyNumberView = findViewById(R.id.numberView);
+        occupancyNumberView = findViewById(R.id.numberView);
+
+        tenTOFreadings = new ArrayList<>();
 
         peopleCountBoard = 0;
         resetNeeded = 1;
@@ -73,6 +78,7 @@ public class MainActivity extends Activity {
         rxBleClient = RxBleClient.create(this);
         connectToOrient(ORIENT_BLE_ADDRESS);
         System.out.println("Connecting to orient...");
+
 //        /* Firebase Test */
 //        readings.put("time1", 1);
 //        readings.put("time2", 2);
@@ -84,6 +90,7 @@ public class MainActivity extends Activity {
 //        mFirestore.collection("PIR_readings").document("hello")
 //                .set(readings);
 //        /* * * * * * * * */
+
 
     }
 
@@ -127,17 +134,34 @@ public class MainActivity extends Activity {
 
         String timestamp = String.valueOf(new Date().getTime());
 
-        pirTriggered = packetData.getInt();
+        //pirTriggered = packetData.getInt();
+        tofTriggered  = packetData.getInt();
 
         if (logging) {
 
             if (counter % 12 == 0) {
 
                 runOnUiThread(() -> {
-                    captureOccupancyNumberView.setText("" + pirTriggered);
+                    occupancyNumberView.setText("" + tofTriggered);
+                    tenTOFreadings.add(tofTriggered);
+
+                    // Lowest reading of every 10
+                    if (tenTOFreadings.size() == 10) {
+                        // Get minimum
+                        int minReading = Collections.min(tenTOFreadings);
+                        occupancyNumberView.setText("min: " + minReading);
+
+                        // Send minimum to cloud
+                        readings.put(String.valueOf(new Date().getTime()), minReading);
+                        mFirestore.collection("TOF_readings")
+                                .document("min_in_10")
+                                .set(readings);
+
+                        // Reset list
+                        tenTOFreadings = new ArrayList<>();
+                    }
                 });
             }
-
             counter += 1;
         }
     }

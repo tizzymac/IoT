@@ -5,7 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context=".MainActivity"
-    android:background="@drawable/appbackground">
+    android:background="@drawable/appbackground"
+    android:layout_gravity="center">
 
     <TextView
         android:layout_width="match_parent"
@@ -16,7 +17,7 @@
         android:textAlignment="center"
         android:textColor="#090809"
         android:textSize="50sp"
-        android:layout_margin="20dp"/>
+        android:layout_margin="25dp"/>
 
     <TextView
         android:id="@+id/numberView"
