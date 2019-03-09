@@ -44,27 +44,17 @@ public class MainActivity extends Activity {
 
     // Bluetooth
     private static final boolean raw = true;
-    private RxBleDevice orient_device_n, orient_device_t;
-    private RxBleClient rxBleClient_n, rxBleClient_t;
-    private ByteBuffer packetData_n, packetData_t;
-
-    boolean connected_n, connected_t = false;
-
-    int peopleCountBoard_n, peopleCountBoard_t = 0;
-    int resetNeeded_n, resetNeeded_t = 0;
-    int pirTriggered_n, pirTriggered_t = 2;
-    int tofTriggered_n, tofTriggered_t = 2;
-    List<Integer> tenTOFreadings_n, tenTOFreadings_t;
-    private int counter_n, counter_t = 0;
-    private boolean logging_n, logging_t = false;
-    int lastReading_n, lastReading_t = 0;
 
     private Context ctx;
     private TextView occupancyNumberView;
 
+    // Boards
+    Board boardN;
+    Board boardT;
+
     // IoT Core
-    private IotCoreCommunicator communicator;
-    private Handler handler;
+//    private IotCoreCommunicator communicator;
+//    private Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,30 +62,18 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         ctx = this;
 
+        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
+
         occupancyNumberView = findViewById(R.id.numberView);
 
-        tenTOFreadings_n = new ArrayList<>();
-        tenTOFreadings_t = new ArrayList<>();
-
-        peopleCountBoard_n= 0;
-        peopleCountBoard_t = 0;
-        resetNeeded_n = 1;
-        resetNeeded_t = 1;
-        counter_n = 0;
-        counter_t = 0;
-
-        packetData_n = ByteBuffer.allocate(18);
-        packetData_n.order(ByteOrder.LITTLE_ENDIAN);
-        packetData_t = ByteBuffer.allocate(18);
-        packetData_t.order(ByteOrder.LITTLE_ENDIAN);
-
-        rxBleClient_n = RxBleClient.create(this);
-        connectToOrient_n(ORIENT_BLE_ADDRESS_n);
+        //rxBleClient_n = RxBleClient.create(this);
+        connectToOrient(boardN);
         Toast.makeText(ctx, "Connected to n", Toast.LENGTH_SHORT).show();
         System.out.println("Connecting to orient n...");
 
-        rxBleClient_t = RxBleClient.create(this);
-        connectToOrient_t(ORIENT_BLE_ADDRESS_t);
+        //rxBleClient_t = RxBleClient.create(this);
+        connectToOrient(boardT);
         Toast.makeText(ctx, "Connected to t", Toast.LENGTH_SHORT).show();
         System.out.println("Connecting to orient t...");
 
@@ -131,13 +109,12 @@ public class MainActivity extends Activity {
 
     }
 
-    private void connectToOrient_n(String addr) {
-        orient_device_n = rxBleClient_n.getBleDevice(addr);
+    private void connectToOrient(Board board) {
         String characteristic;
         if (raw) characteristic = ORIENT_RAW_CHARACTERISTIC; else characteristic = ORIENT_QUAT_CHARACTERISTIC;
 
         System.out.println("Establishing connection...");
-        orient_device_n.establishConnection(false)
+        board.getDevice().establishConnection(false)
                 .flatMap(rxBleConnection -> rxBleConnection.setupNotification(UUID.fromString(characteristic)))
                 .doOnNext(notificationObservable -> {
                     // Notification has been set up
@@ -145,16 +122,16 @@ public class MainActivity extends Activity {
                 .flatMap(notificationObservable -> notificationObservable) // <-- Notification has been set up, now observe value changes.
                 .subscribe(
                         bytes -> {
-                            if (!connected_n) {
-                                connected_n = true;
+                            if (!board.isConnected()) {
+                                board.setConnected(true);
                                 System.out.println("Connected");
                                 runOnUiThread(() -> {
                                     Toast.makeText(ctx, "Receiving sensor data",
                                            Toast.LENGTH_SHORT).show();
-                                    logging_n = true;
+                                    board.setLogging(true);
                                 });
                             }
-                            if (raw) handleRawPacket(bytes, 'n');
+                            if (raw) handleRawPacket(bytes, board);
                         },
                         throwable -> {
                             // Handle an error here.
@@ -163,170 +140,99 @@ public class MainActivity extends Activity {
                 );
     }
 
-    private void connectToOrient_t(String addr) {
-        orient_device_t = rxBleClient_t.getBleDevice(addr);
-        String characteristic;
-        if (raw) characteristic = ORIENT_RAW_CHARACTERISTIC; else characteristic = ORIENT_QUAT_CHARACTERISTIC;
+    private void handleRawPacket(final byte[] bytes, Board board) {
 
-        System.out.println("Establishing connection...");
-        orient_device_t.establishConnection(false)
-                .flatMap(rxBleConnection -> rxBleConnection.setupNotification(UUID.fromString(characteristic)))
-                .doOnNext(notificationObservable -> {
-                    // Notification has been set up
-                })
-                .flatMap(notificationObservable -> notificationObservable) // <-- Notification has been set up, now observe value changes.
-                .subscribe(
-                        bytes -> {
-                            if (!connected_t) {
-                                connected_t = true;
-                                System.out.println("Connected");
-                                runOnUiThread(() -> {
-                                    Toast.makeText(ctx, "Receiving sensor data",
-                                            Toast.LENGTH_SHORT).show();
-                                    logging_t = true;
-                                });
-                            }
-                            if (raw) handleRawPacket(bytes, 't');
-                        },
-                        throwable -> {
-                            // Handle an error here.
-                            Log.e("OrientAndroid", "Error: " + throwable.toString());
-                        }
-                );
-    }
+        board.clearPacketData();
+        board.putPacketData(bytes);
+        board.setPacketDataPosition(0);
+        board.setTofTriggered(board.getPacketDataInt());
 
-    private void handleRawPacket(final byte[] bytes, char c) {
-        long ts = System.currentTimeMillis();
+        if (board.isLogging()) {
+            if (board.getCounter() % 2 == 0) {
+                runOnUiThread(() -> {
+                    occupancyNumberView.setText("" + board.getTofTriggered());
+                    board.addTofReading();
 
-        String timestamp = String.valueOf(new Date().getTime());
+                    // Lowest reading of every 10
+                    if (board.getListSize() == 10) {
 
-        switch (c) {
-            case ('n') :
-                packetData_n.clear();
-                packetData_n.put(bytes);
-                packetData_n.position(0);
-                tofTriggered_n  = packetData_n.getInt();
-                if (logging_n) {
-                    if (counter_n % 2 == 0) {
-                        runOnUiThread(() -> {
-                            occupancyNumberView.setText("" + tofTriggered_n);
-                            tenTOFreadings_n.add(tofTriggered_n);
+                        //                        // Get minimum
+                        //                        int minReading = Collections.min(tenTOFreadings);
+                        //                        occupancyNumberView.setText("min: " + minReading);
+                        //
+                        //                        // Send minimum to cloud
+                        //                        readings.put(String.valueOf(new Date().getTime()), minReading);
+                        //                        mFirestore.collection("TOF_readings")
+                        //                                .document("min_in_10")
+                        //                                .set(readings);
 
-                            // Lowest reading of every 10
-                            if (tenTOFreadings_n.size() == 10) {
+                        // Compare every tenth reading with previous tenth reading
+                        // If they differ, send the value to the cloud
 
-    //                        // Get minimum
-    //                        int minReading = Collections.min(tenTOFreadings);
-    //                        occupancyNumberView.setText("min: " + minReading);
-    //
-    //                        // Send minimum to cloud
-    //                        readings.put(String.valueOf(new Date().getTime()), minReading);
-    //                        mFirestore.collection("TOF_readings")
-    //                                .document("min_in_10")
-    //                                .set(readings);
-
-                                // Compare every tenth reading with previous tenth reading
-                                // If they differ, send the value to the cloud
-
-                                // Reset list
-                                tenTOFreadings_n = new ArrayList<>();
-                            }
-
-                            if ((Math.abs(tofTriggered_n - lastReading_n) > 5) && (tofTriggered_n < 1000)) {
-                                readings_n.put(String.valueOf(new Date().getTime()), tofTriggered_n);
-                                mFirestore.collection("TOF_readings")
-                                        .document(ORIENT_BLE_ADDRESS_n)
-                                        .set(readings_n);
-                            }
-                            lastReading_n = tofTriggered_n;
-
-
-                        });
+                        // Reset list
+                        board.resetList();
                     }
-                    counter_n += 1;
-                }
-            case ('t'):
-                packetData_t.clear();
-                packetData_t.put(bytes);
-                packetData_t.position(0);
-                tofTriggered_t = packetData_t.getInt();
-                if (logging_t) {
-                    if (counter_t % 2 == 0) {
-                        runOnUiThread(() -> {
-                            occupancyNumberView.setText("" + tofTriggered_t);
-                            tenTOFreadings_t.add(tofTriggered_t);
 
-                            // Lowest reading of every 10
-                            if (tenTOFreadings_t.size() == 10) {
+                    switch (board.getTag()) {
+                        case ('n') :
+                        if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
+                            readings_n.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
+                            mFirestore.collection("TOF_readings")
+                                    .document(board.getBleAddress())
+                                    .set(readings_n);
+                        }
 
-                                //                        // Get minimum
-                                //                        int minReading = Collections.min(tenTOFreadings);
-                                //                        occupancyNumberView.setText("min: " + minReading);
-                                //
-                                //                        // Send minimum to cloud
-                                //                        readings.put(String.valueOf(new Date().getTime()), minReading);
-                                //                        mFirestore.collection("TOF_readings")
-                                //                                .document("min_in_10")
-                                //                                .set(readings);
-
-                                // Compare every tenth reading with previous tenth reading
-                                // If they differ, send the value to the cloud
-
-                                // Reset list
-                                tenTOFreadings_t = new ArrayList<>();
-                            }
-
-                            if ((Math.abs(tofTriggered_t - lastReading_t) > 5) && (tofTriggered_t < 1000)) {
-                                readings_t.put(String.valueOf(new Date().getTime()), tofTriggered_t);
+                        case ('t') :
+                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
+                                readings_t.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
                                 mFirestore.collection("TOF_readings")
-                                        .document(ORIENT_BLE_ADDRESS_t)
+                                        .document(board.getBleAddress())
                                         .set(readings_t);
                             }
-                            lastReading_t = tofTriggered_t;
-
-
-                        });
                     }
-                    counter_t += 1;
-                }
-        }
-    }
+                    board.setLastReading(board.getTofTriggered());
 
-    /* IoT Core bits */
-    private final Runnable connectOffTheMainThread = new Runnable() {
-        @Override
-        public void run() {
-            communicator.connect();
-
-            handler.post(sendMqttMessage);
-        }
-    };
-
-    private final Runnable sendMqttMessage = new Runnable() {
-        private int i;
-
-        /**
-         * We post 10 messages as an example, 1 every 5 seconds
-         */
-        @Override
-        public void run() {
-            if (i == 10) {
-                return;
+                });
             }
-
-            // events is the default topic for MQTT communication
-            String subtopic = "events";
-            // Your message you want to send
-            String message = "Hello World " + i++;
-            communicator.publishMessage(subtopic, message);
-
-            handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
+            board.increaseCounter();
         }
-    };
-
-    @Override
-    protected void onDestroy() {
-        communicator.disconnect();
-        super.onDestroy();
     }
+
+//    /* IoT Core bits */
+//    private final Runnable connectOffTheMainThread = new Runnable() {
+//        @Override
+//        public void run() {
+//            communicator.connect();
+//
+//            handler.post(sendMqttMessage);
+//        }
+//    };
+//
+//    private final Runnable sendMqttMessage = new Runnable() {
+//        private int i;
+//
+//        /**
+//         * We post 10 messages as an example, 1 every 5 seconds
+//         */
+//        @Override
+//        public void run() {
+//            if (i == 10) {
+//                return;
+//            }
+//
+//            // events is the default topic for MQTT communication
+//            String subtopic = "events";
+//            // Your message you want to send
+//            String message = "Hello World " + i++;
+//            communicator.publishMessage(subtopic, message);
+//
+//            handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
+//        }
+//    };
+//
+//    @Override
+//    protected void onDestroy() {
+//        communicator.disconnect();
+//        super.onDestroy();
+//    }
 }
