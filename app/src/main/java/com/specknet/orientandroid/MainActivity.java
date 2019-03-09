@@ -3,26 +3,16 @@ package com.specknet.orientandroid;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.polidea.rxandroidble2.RxBleClient;
-import com.polidea.rxandroidble2.RxBleDevice;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
 
@@ -67,28 +57,11 @@ public class MainActivity extends Activity {
 
         occupancyNumberView = findViewById(R.id.numberView);
 
-        //rxBleClient_n = RxBleClient.create(this);
         connectToOrient(boardN);
         Toast.makeText(ctx, "Connected to n", Toast.LENGTH_SHORT).show();
-        System.out.println("Connecting to orient n...");
 
-        //rxBleClient_t = RxBleClient.create(this);
         connectToOrient(boardT);
         Toast.makeText(ctx, "Connected to t", Toast.LENGTH_SHORT).show();
-        System.out.println("Connecting to orient t...");
-
-//        /* Firebase Test */
-//        readings.put("time1", 1);
-//        readings.put("time2", 2);
-//
-//        mFirestore.collection("PIR_readings").document("hello")
-//                .set(readings);
-//
-//        readings.put("time3", 3);
-//        mFirestore.collection("PIR_readings").document("hello")
-//                .set(readings);
-//        /* * * * * * * * */
-
 
         /* IoT Core Test */
 //        // Setup the communication with your Google IoT Core details
@@ -124,9 +97,9 @@ public class MainActivity extends Activity {
                         bytes -> {
                             if (!board.isConnected()) {
                                 board.setConnected(true);
-                                System.out.println("Connected");
+                                System.out.println("Connected to " + board.getTag());
                                 runOnUiThread(() -> {
-                                    Toast.makeText(ctx, "Receiving sensor data",
+                                    Toast.makeText(ctx, "Receiving sensor data from " + board.getTag(),
                                            Toast.LENGTH_SHORT).show();
                                     board.setLogging(true);
                                 });
@@ -148,45 +121,26 @@ public class MainActivity extends Activity {
         board.setTofTriggered(board.getPacketDataInt());
 
         if (board.isLogging()) {
-            if (board.getCounter() % 2 == 0) {
+            if (board.getCounter() % 3 == 0) {
                 runOnUiThread(() -> {
-                    occupancyNumberView.setText("" + board.getTofTriggered());
-                    board.addTofReading();
-
-                    // Lowest reading of every 10
-                    if (board.getListSize() == 10) {
-
-                        //                        // Get minimum
-                        //                        int minReading = Collections.min(tenTOFreadings);
-                        //                        occupancyNumberView.setText("min: " + minReading);
-                        //
-                        //                        // Send minimum to cloud
-                        //                        readings.put(String.valueOf(new Date().getTime()), minReading);
-                        //                        mFirestore.collection("TOF_readings")
-                        //                                .document("min_in_10")
-                        //                                .set(readings);
-
-                        // Compare every tenth reading with previous tenth reading
-                        // If they differ, send the value to the cloud
-
-                        // Reset list
-                        board.resetList();
+                    if (board.getTag() == 'n') {
+                        occupancyNumberView.setText("" + board.getTofTriggered());
                     }
+                    board.addTofReading();
 
                     switch (board.getTag()) {
                         case ('n') :
-                        if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
-                            readings_n.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
-                            mFirestore.collection("TOF_readings")
-                                    .document(board.getBleAddress())
-                                    .set(readings_n);
-                        }
-
+                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
+                                readings_n.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
+                                mFirestore.collection("TOF_readings")
+                                        .document(ORIENT_BLE_ADDRESS_n)
+                                        .set(readings_n);
+                            }
                         case ('t') :
                             if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
                                 readings_t.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
                                 mFirestore.collection("TOF_readings")
-                                        .document(board.getBleAddress())
+                                        .document(ORIENT_BLE_ADDRESS_t)
                                         .set(readings_t);
                             }
                     }

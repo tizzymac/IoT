@@ -17,7 +17,7 @@ public class Board {
     private static final String ORIENT_RAW_CHARACTERISTIC = "0000a001-0000-1000-8000-00805f9b34fb";
 
     // Bluetooth
-    private static String BLE_ADDRESS;
+    private static String ble_address;
     private static final boolean raw = true;
     private RxBleDevice device;
     private RxBleClient rxBleClient;
@@ -25,8 +25,6 @@ public class Board {
 
     private boolean connected = false;
 
-    private int peopleCountBoard;
-    private int resetNeeded;
     private int pirTriggered;
     private int tofTriggered;
     private List<Integer> tenTOFreadings;
@@ -39,10 +37,8 @@ public class Board {
     public Board(Context context, String bleAddress, char tag) {
 
         this.tag = tag;
-        this.BLE_ADDRESS = bleAddress;
+        this.ble_address = bleAddress;
 
-        this.peopleCountBoard = 0;
-        this.resetNeeded = 0;
         this.pirTriggered = 2;
         this.tofTriggered = 2;
         this.tenTOFreadings = new ArrayList<>();
@@ -55,7 +51,7 @@ public class Board {
 
         this.rxBleClient = RxBleClient.create(context);
 
-        this.device = rxBleClient.getBleDevice(BLE_ADDRESS);
+        this.device = rxBleClient.getBleDevice(ble_address);
     }
 
     public RxBleDevice getDevice() {
@@ -75,7 +71,7 @@ public class Board {
     }
 
     public static String getBleAddress() {
-        return BLE_ADDRESS;
+        return ble_address;
     }
 
     public void setLastReading(int lastReading) {
