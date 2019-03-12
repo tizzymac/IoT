@@ -60,6 +60,9 @@ public class MainActivity extends Activity {
     AtomicBoolean under500n = new AtomicBoolean(false);
     AtomicBoolean over1000n = new AtomicBoolean(false);
 
+    // Find direction
+    char firstBoard;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -73,6 +76,7 @@ public class MainActivity extends Activity {
         occupancyNumberView2 = findViewById(R.id.numberView2);
         peopleCount = 0;
         peopleCount2 = 0;
+        firstBoard = '0';
 
         connectToOrient(boardN);
         Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
@@ -176,9 +180,21 @@ public class MainActivity extends Activity {
 
                                 // Just need one more reading over 1000
                                 if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
-                                    // Count a person!
-                                    peopleCount++;
-                                    occupancyNumberView.setText("" + peopleCount);
+//                                    // Count a person!
+//                                    peopleCount++;
+//                                    occupancyNumberView.setText("" + peopleCount);
+
+                                    // Find direction
+                                    if (firstBoard == 'n') {
+                                        // Count a person!
+                                        peopleCount++;
+                                        occupancyNumberView.setText("" + peopleCount);
+                                        occupancyNumberView2.setText("in");
+                                        firstBoard = '0';
+                                    } else {
+                                        firstBoard = 't';
+                                        // wait for second board to increase reading
+                                    }
 
                                     // reset
                                     board.resetFiveList();
@@ -253,9 +269,21 @@ public class MainActivity extends Activity {
 
                                 // Just need one more reading over 1000
                                 if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
-                                    // Count a person!
-                                    peopleCount2++;
-                                    occupancyNumberView2.setText("" + peopleCount2);
+//                                    // Count a person!
+//                                    peopleCount2++;
+//                                    occupancyNumberView2.setText("" + peopleCount2);
+
+                                    // Find direction
+                                    if (firstBoard == 't') {
+                                        // Count a person!
+                                        peopleCount--;
+                                        occupancyNumberView.setText("" + peopleCount);
+                                        occupancyNumberView2.setText("out");
+                                        firstBoard = '0';
+                                    } else {
+                                        firstBoard = 'n';
+                                        // wait for second board to increase reading
+                                    }
 
                                     // reset
                                     board.resetFiveList();
