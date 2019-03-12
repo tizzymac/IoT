@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity {
 
@@ -42,9 +43,15 @@ public class MainActivity extends Activity {
     Board boardN;
     Board boardT;
 
+    private int peopleCount;
+
     // IoT Core
 //    private IotCoreCommunicator communicator;
 //    private Handler handler;
+
+    // People counting flags
+    AtomicBoolean under500 = new AtomicBoolean(false);
+    AtomicBoolean over1000 = new AtomicBoolean(false);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +63,7 @@ public class MainActivity extends Activity {
         boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
 
         occupancyNumberView = findViewById(R.id.numberView);
+        peopleCount = 0;
 
         connectToOrient(boardN);
         Toast.makeText(ctx, "Connected to n", Toast.LENGTH_SHORT).show();
@@ -121,23 +129,105 @@ public class MainActivity extends Activity {
         board.setTofTriggered(board.getPacketDataInt());
 
         if (board.isLogging()) {
-            if (board.getCounter() % 3 == 0) {
+            if (board.getCounter() % 1 == 0) {
                 runOnUiThread(() -> {
-                    if (board.getTag() == 'n') {
-                        occupancyNumberView.setText("" + board.getTofTriggered());
+                    if (board.getTag() == 't') {
+//                        occupancyNumberView.setText("" + board.getTofTriggered());
+//                    }
+
+                        // ******************************************
+                        // at least 5 readings under 500 followed by
+                        // Check for readings > 1000 three in a row
+                        // TODO in what time period??
+
+                        Log.d("READING", "" + board.getTofTriggered());
+                        if (under500.get()) {
+
+                            if (over1000.get()) {
+
+                                // Looking for readings over 1000, smaller reading found
+                                if ((board.getTofTriggered() < 1000)) {
+                                    // person not counted
+                                    // reset
+                                    board.resetFiveList();
+                                    board.resetThreeList();
+                                    over1000.set(false);
+                                    under500.set(false);
+
+                                    Log.d("STATE", "A");
+                                }
+
+                                // Looking for readings over 1000, reading found
+                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() < 3)) {
+                                    board.addThreeReading();
+
+                                    Log.d("STATE", "B");
+                                }
+
+                                // Just need one more reading over 1000
+                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
+                                    // Count a person!
+                                    peopleCount++;
+                                    occupancyNumberView.setText(peopleCount);
+
+                                    // reset
+                                    board.resetFiveList();
+                                    board.resetThreeList();
+                                    over1000.set(false);
+                                    under500.set(false);
+
+                                    Log.d("STATE", "C");
+                                }
+                            } else {
+
+                                // Adding readings under 500
+                                if ((board.getTofTriggered() < 500) && (board.getFiveSize() < 4)) {
+                                    board.addFiveReading();
+
+                                    Log.d("STATE", "D");
+                                }
+
+                                // Looking for readings under 500 but larger reading seen -> reset
+                                if ((board.getTofTriggered() > 1000) && (board.getFiveSize() < 4)) {
+                                    under500.set(false);
+                                    board.resetFiveList();
+
+                                    Log.d("STATE", "E");
+                                }
+
+                                // After 5 readings under 500 reached, reading over 1000 seen
+                                if ((board.getFiveSize() >= 4) && (board.getTofTriggered() > 1000)) {
+                                    // switch to counting threes
+                                    over1000.set(true);
+                                    board.addThreeReading();
+
+                                    Log.d("STATE", "F");
+                                }
+                            }
+
+                        } else {
+                            // initial
+                            if ((board.getTofTriggered() < 500) && (board.getFiveSize() == 0)) {
+                                under500.set(true);
+                                board.addFiveReading();
+
+                                Log.d("STATE", "G");
+                            }
+                        }
+
                     }
-                    board.addTofReading();
+                    // ************************
 
                     switch (board.getTag()) {
                         case ('n') :
-                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
+                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 500) && (board.getTofTriggered() > 0)) {
                                 readings_n.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
                                 mFirestore.collection("TOF_readings")
                                         .document(ORIENT_BLE_ADDRESS_n)
                                         .set(readings_n);
                             }
                         case ('t') :
-                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 1000)) {
+                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 500) && (board.getTofTriggered() > 0)) {
                                 readings_t.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
                                 mFirestore.collection("TOF_readings")
                                         .document(ORIENT_BLE_ADDRESS_t)

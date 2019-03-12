@@ -27,7 +27,8 @@ public class Board {
 
     private int pirTriggered;
     private int tofTriggered;
-    private List<Integer> tenTOFreadings;
+    private List<Integer> fiveUnder500;
+    private List<Integer> threeOver100;
     private int counter;
     private boolean logging;
     private int lastReading;
@@ -41,7 +42,8 @@ public class Board {
 
         this.pirTriggered = 2;
         this.tofTriggered = 2;
-        this.tenTOFreadings = new ArrayList<>();
+        this.fiveUnder500 = new ArrayList<>();
+        this.threeOver100 = new ArrayList<>();
         this.counter = 0;
         this.logging = false;
         this.lastReading = 0;
@@ -58,16 +60,28 @@ public class Board {
         return device;
     }
 
-    public void resetList() {
-        this.tenTOFreadings = new ArrayList<>();
+    public void resetFiveList() {
+        this.fiveUnder500 = new ArrayList<>();
     }
 
-    public void addTofReading() {
-        tenTOFreadings.add(tofTriggered);
+    public void addFiveReading() {
+        fiveUnder500.add(tofTriggered);
     }
 
-    public int getListSize() {
-        return tenTOFreadings.size();
+    public int getFiveSize() {
+        return fiveUnder500.size();
+    }
+
+    public void resetThreeList() {
+        this.threeOver100 = new ArrayList<>();
+    }
+
+    public void addThreeReading() {
+        threeOver100.add(tofTriggered);
+    }
+
+    public int getThreeSize() {
+        return threeOver100.size();
     }
 
     public static String getBleAddress() {
