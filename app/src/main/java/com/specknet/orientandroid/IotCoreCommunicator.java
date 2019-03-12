@@ -12,6 +12,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 public class IotCoreCommunicator {
@@ -149,9 +150,11 @@ public class IotCoreCommunicator {
             iMqttToken.waitForCompletion(TimeUnit.SECONDS.toMillis(30));
             Log.d("TUT", "IoT Core connection established.");
         } catch (MqttException e) {
-            throw new IllegalStateException(e);
+            throw new IllegalStateException(e); // Timed out waiting for a response from the server (32000)
         }
+
     }
+
 
     /**
      * Configuration is managed and sent from the IoT Core Platform

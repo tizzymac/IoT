@@ -50,9 +50,9 @@ public class MainActivity extends Activity {
     private int peopleCount;
     private int peopleCount2;
 
-//    // IoT Core
-//    private IotCoreCommunicator communicator;
-//    private Handler handler;
+    // IoT Core
+    private IotCoreCommunicator communicator;
+    private Handler handler;
 
     // People counting flags
     AtomicBoolean under500 = new AtomicBoolean(false);
@@ -69,37 +69,36 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         ctx = this;
 
-        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
-
         occupancyNumberView = findViewById(R.id.numberView);
         occupancyNumberView2 = findViewById(R.id.numberView2);
         peopleCount = 0;
         peopleCount2 = 0;
         firstBoard = '0';
 
+        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
         connectToOrient(boardN);
         Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
-        connectToOrient(boardT);
-        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
+//        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
+//        connectToOrient(boardT);
+//        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
-//        /* IoT Core Test */
-//        // Setup the communication with your Google IoT Core details
-//        communicator = new IotCoreCommunicator.Builder()
-//                .withContext(this)
-//                .withCloudRegion("europe-west1")
-//                .withProjectId("trans-sunset-231415")
-//                .withRegistryId("iot_android_app")
-//                .withDeviceId("test-device")
-//                .withPrivateKeyRawFileId(R.raw.rsa_private)
-//                //.withPrivateKeyRawFileId(R.raw.rsa_private_pkcs8)
-//                .build();
-//        HandlerThread thread = new HandlerThread("MyBackgroundThread");
-//        thread.start();
-//        handler = new Handler(thread.getLooper());
-//        handler.post(connectOffTheMainThread); // Use whatever threading mechanism you want
-//        /* *** */
+        /* IoT Core Test */
+        // Setup the communication with your Google IoT Core details
+        communicator = new IotCoreCommunicator.Builder()
+                .withContext(this)
+                .withCloudRegion("europe-west1")
+                .withProjectId("trans-sunset-231415")
+                .withRegistryId("iot_android_app")
+                .withDeviceId("test-device")
+                .withPrivateKeyRawFileId(R.raw.rsa_private)
+                //.withPrivateKeyRawFileId(R.raw.rsa_private_pkcs8)
+                .build();
+        HandlerThread thread = new HandlerThread("MyBackgroundThread");
+        thread.start();
+        handler = new Handler(thread.getLooper());
+        handler.post(connectOffTheMainThread); // Use whatever threading mechanism you want
+        /* *** */
 
     }
 
@@ -356,41 +355,41 @@ public class MainActivity extends Activity {
         }
     }
 
-//    /* IoT Core bits */
-//    private final Runnable connectOffTheMainThread = new Runnable() {
-//        @Override
-//        public void run() {
-//            communicator.connect();
-//
-//            handler.post(sendMqttMessage);
-//        }
-//    };
-//
-//    private final Runnable sendMqttMessage = new Runnable() {
-//        private int i;
-//
-//        /**
-//         * We post 10 messages as an example, 1 every 5 seconds
-//         */
-//        @Override
-//        public void run() {
-//            if (i == 10) {
-//                return;
-//            }
-//
-//            // events is the default topic for MQTT communication
-//            String subtopic = "events";
-//            // Your message you want to send
-//            String message = "Hello World " + i++;
-//            communicator.publishMessage(subtopic, message);
-//
-//            handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
-//        }
-//    };
-//
-//    @Override
-//    protected void onDestroy() {
-//        communicator.disconnect();
-//        super.onDestroy();
-//    }
+    /* IoT Core bits */
+    private final Runnable connectOffTheMainThread = new Runnable() {
+        @Override
+        public void run() {
+            communicator.connect();
+
+            handler.post(sendMqttMessage);
+        }
+    };
+
+    private final Runnable sendMqttMessage = new Runnable() {
+        private int i;
+
+        /**
+         * We post 10 messages as an example, 1 every 5 seconds
+         */
+        @Override
+        public void run() {
+            if (i == 10) {
+                return;
+            }
+
+            // events is the default topic for MQTT communication
+            String subtopic = "events";
+            // Your message you want to send
+            String message = "Hello World " + i++;
+            communicator.publishMessage(subtopic, message);
+
+            handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        communicator.disconnect();
+        super.onDestroy();
+    }
 }
