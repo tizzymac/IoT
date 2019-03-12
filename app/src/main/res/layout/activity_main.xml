@@ -29,4 +29,14 @@
         android:textSize="80sp"
         android:layout_margin="20dp"/>
 
+    <TextView
+        android:id="@+id/numberView2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textAlignment="center"
+        android:textColor="#090809"
+        android:textSize="80sp"
+        android:layout_margin="20dp"/>
+
 </LinearLayout>

@@ -3,6 +3,8 @@ package com.specknet.orientandroid;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -13,6 +15,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity {
@@ -38,20 +41,24 @@ public class MainActivity extends Activity {
 
     private Context ctx;
     private TextView occupancyNumberView;
+    private TextView occupancyNumberView2;
 
     // Boards
     Board boardN;
     Board boardT;
 
     private int peopleCount;
+    private int peopleCount2;
 
-    // IoT Core
+//    // IoT Core
 //    private IotCoreCommunicator communicator;
 //    private Handler handler;
 
     // People counting flags
     AtomicBoolean under500 = new AtomicBoolean(false);
     AtomicBoolean over1000 = new AtomicBoolean(false);
+    AtomicBoolean under500n = new AtomicBoolean(false);
+    AtomicBoolean over1000n = new AtomicBoolean(false);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,15 +70,17 @@ public class MainActivity extends Activity {
         boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
 
         occupancyNumberView = findViewById(R.id.numberView);
+        occupancyNumberView2 = findViewById(R.id.numberView2);
         peopleCount = 0;
+        peopleCount2 = 0;
 
         connectToOrient(boardN);
-        Toast.makeText(ctx, "Connected to n", Toast.LENGTH_SHORT).show();
+        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
         connectToOrient(boardT);
-        Toast.makeText(ctx, "Connected to t", Toast.LENGTH_SHORT).show();
+        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
-        /* IoT Core Test */
+//        /* IoT Core Test */
 //        // Setup the communication with your Google IoT Core details
 //        communicator = new IotCoreCommunicator.Builder()
 //                .withContext(this)
@@ -79,8 +88,8 @@ public class MainActivity extends Activity {
 //                .withProjectId("trans-sunset-231415")
 //                .withRegistryId("iot_android_app")
 //                .withDeviceId("test-device")
-//                //.withPrivateKeyRawFileId(R.raw.rsa_private)
-//                .withPrivateKeyRawFileId(R.raw.rsa_private_pkcs8)
+//                .withPrivateKeyRawFileId(R.raw.rsa_private)
+//                //.withPrivateKeyRawFileId(R.raw.rsa_private_pkcs8)
 //                .build();
 //        HandlerThread thread = new HandlerThread("MyBackgroundThread");
 //        thread.start();
@@ -132,6 +141,7 @@ public class MainActivity extends Activity {
             if (board.getCounter() % 1 == 0) {
                 runOnUiThread(() -> {
                     if (board.getTag() == 't') {
+
 //                        occupancyNumberView.setText("" + board.getTofTriggered());
 //                    }
 
@@ -140,7 +150,7 @@ public class MainActivity extends Activity {
                         // Check for readings > 1000 three in a row
                         // TODO in what time period??
 
-                        Log.d("READING", "" + board.getTofTriggered());
+                        Log.d("READING_t", "" + board.getTofTriggered());
                         if (under500.get()) {
 
                             if (over1000.get()) {
@@ -154,21 +164,21 @@ public class MainActivity extends Activity {
                                     over1000.set(false);
                                     under500.set(false);
 
-                                    Log.d("STATE", "A");
+                                    Log.d("STATE_t", "A");
                                 }
 
                                 // Looking for readings over 1000, reading found
                                 if ((board.getTofTriggered() > 1000) && (board.getThreeSize() < 3)) {
                                     board.addThreeReading();
 
-                                    Log.d("STATE", "B");
+                                    Log.d("STATE_t", "B");
                                 }
 
                                 // Just need one more reading over 1000
                                 if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
                                     // Count a person!
                                     peopleCount++;
-                                    occupancyNumberView.setText(peopleCount);
+                                    occupancyNumberView.setText("" + peopleCount);
 
                                     // reset
                                     board.resetFiveList();
@@ -176,7 +186,7 @@ public class MainActivity extends Activity {
                                     over1000.set(false);
                                     under500.set(false);
 
-                                    Log.d("STATE", "C");
+                                    Log.d("STATE_t", "C");
                                 }
                             } else {
 
@@ -184,7 +194,7 @@ public class MainActivity extends Activity {
                                 if ((board.getTofTriggered() < 500) && (board.getFiveSize() < 4)) {
                                     board.addFiveReading();
 
-                                    Log.d("STATE", "D");
+                                    Log.d("STATE_t", "D");
                                 }
 
                                 // Looking for readings under 500 but larger reading seen -> reset
@@ -192,7 +202,7 @@ public class MainActivity extends Activity {
                                     under500.set(false);
                                     board.resetFiveList();
 
-                                    Log.d("STATE", "E");
+                                    Log.d("STATE_t", "E");
                                 }
 
                                 // After 5 readings under 500 reached, reading over 1000 seen
@@ -201,7 +211,7 @@ public class MainActivity extends Activity {
                                     over1000.set(true);
                                     board.addThreeReading();
 
-                                    Log.d("STATE", "F");
+                                    Log.d("STATE_t", "F");
                                 }
                             }
 
@@ -215,6 +225,82 @@ public class MainActivity extends Activity {
                             }
                         }
 
+                    } else { // tag == 'n'
+
+                        Log.d("READING_n", "" + board.getTofTriggered());
+                        if (under500n.get()) {
+
+                            if (over1000n.get()) {
+
+                                // Looking for readings over 1000, smaller reading found
+                                if ((board.getTofTriggered() < 1000)) {
+                                    // person not counted
+                                    // reset
+                                    board.resetFiveList();
+                                    board.resetThreeList();
+                                    over1000n.set(false);
+                                    under500n.set(false);
+
+                                    Log.d("STATE_n", "A");
+                                }
+
+                                // Looking for readings over 1000, reading found
+                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() < 3)) {
+                                    board.addThreeReading();
+
+                                    Log.d("STATE_n", "B");
+                                }
+
+                                // Just need one more reading over 1000
+                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
+                                    // Count a person!
+                                    peopleCount2++;
+                                    occupancyNumberView2.setText("" + peopleCount2);
+
+                                    // reset
+                                    board.resetFiveList();
+                                    board.resetThreeList();
+                                    over1000n.set(false);
+                                    under500n.set(false);
+
+                                    Log.d("STATE_n", "C");
+                                }
+                            } else {
+
+                                // Adding readings under 500
+                                if ((board.getTofTriggered() < 500) && (board.getFiveSize() < 4)) {
+                                    board.addFiveReading();
+
+                                    Log.d("STATE_n", "D");
+                                }
+
+                                // Looking for readings under 500 but larger reading seen -> reset
+                                if ((board.getTofTriggered() > 1000) && (board.getFiveSize() < 4)) {
+                                    under500n.set(false);
+                                    board.resetFiveList();
+
+                                    Log.d("STATE_n", "E");
+                                }
+
+                                // After 5 readings under 500 reached, reading over 1000 seen
+                                if ((board.getFiveSize() >= 4) && (board.getTofTriggered() > 1000)) {
+                                    // switch to counting threes
+                                    over1000n.set(true);
+                                    board.addThreeReading();
+
+                                    Log.d("STATE_n", "F");
+                                }
+                            }
+
+                        } else {
+                            // initial
+                            if ((board.getTofTriggered() < 500) && (board.getFiveSize() == 0)) {
+                                under500n.set(true);
+                                board.addFiveReading();
+
+                                Log.d("STATE", "G");
+                            }
+                        }
                     }
                     // ************************
 
