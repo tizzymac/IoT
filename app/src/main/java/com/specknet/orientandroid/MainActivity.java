@@ -10,6 +10,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.gson.JsonObject;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -79,9 +83,9 @@ public class MainActivity extends Activity {
         connectToOrient(boardN);
         Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
-//        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
-//        connectToOrient(boardT);
-//        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
+        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
+        connectToOrient(boardT);
+        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
         /* IoT Core Test */
         // Setup the communication with your Google IoT Core details
@@ -189,6 +193,12 @@ public class MainActivity extends Activity {
                                         peopleCount++;
                                         occupancyNumberView.setText("" + peopleCount);
                                         occupancyNumberView2.setText("in");
+
+                                        // Send data to cloud
+                                        String subtopic = "events"; // events is the default topic for MQTT communication
+                                        String message = "Person entered";
+                                        communicator.publishMessage(subtopic, message);
+
                                         firstBoard = '0';
                                     } else {
                                         firstBoard = 't';
@@ -278,6 +288,12 @@ public class MainActivity extends Activity {
                                         peopleCount--;
                                         occupancyNumberView.setText("" + peopleCount);
                                         occupancyNumberView2.setText("out");
+
+                                        // Send data to cloud
+                                        String subtopic = "events"; // events is the default topic for MQTT communication
+                                        String message = "Person exited";
+                                        communicator.publishMessage(subtopic, message);
+
                                         firstBoard = '0';
                                     } else {
                                         firstBoard = 'n';
@@ -377,13 +393,23 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            // events is the default topic for MQTT communication
-            String subtopic = "events";
-            // Your message you want to send
-            String message = "Hello World " + i++;
-            communicator.publishMessage(subtopic, message);
+            try {
 
-            handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
+                // events is the default topic for MQTT communication
+                String subtopic = "events";
+                String messageJSON = new JSONObject()
+                        .put("PeopleInRoom", ""+i++)
+                        .toString();
+                communicator.publishMessage(subtopic, messageJSON);
+
+                handler.postDelayed(this, TimeUnit.SECONDS.toMillis(5));
+
+                // View messages :
+                // gcloud pubsub subscriptions pull --auto-ack projects/trans-sunset-231415/subscriptions/topic-subscription
+
+            } catch (JSONException e) {
+                throw new IllegalStateException(e);
+            }
         }
     };
 

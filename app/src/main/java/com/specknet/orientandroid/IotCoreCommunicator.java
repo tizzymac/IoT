@@ -111,9 +111,10 @@ public class IotCoreCommunicator {
             }
 
             @Override
-            public void messageArrived(String topic, MqttMessage message) throws Exception {
+            public void messageArrived(String topic, MqttMessage message) {
                 Log.d("TUT", "message arrived " + topic + " MSG " + message);
                 // You need to do something with messages when they arrive
+                // TODO
             }
 
             @Override
@@ -150,11 +151,11 @@ public class IotCoreCommunicator {
             iMqttToken.waitForCompletion(TimeUnit.SECONDS.toMillis(30));
             Log.d("TUT", "IoT Core connection established.");
         } catch (MqttException e) {
-            throw new IllegalStateException(e); // Timed out waiting for a response from the server (32000)
+            throw new IllegalStateException(e);
+            // Timed out waiting for a response from the server (32000)
+            // SOLUTION: https://stackoverflow.com/questions/32413643/paho-mqttandroidclient-connect-always-fails
         }
-
     }
-
 
     /**
      * Configuration is managed and sent from the IoT Core Platform
@@ -169,8 +170,7 @@ public class IotCoreCommunicator {
 
     public void publishMessage(String subtopic, String message) {
         String topic = "/devices/" + deviceId + "/" + subtopic;
-        String payload = "{msg:\"" + message + "\"}";
-        MqttMessage mqttMessage = new MqttMessage(payload.getBytes());
+        MqttMessage mqttMessage = new MqttMessage(message.getBytes());
         mqttMessage.setQos(1);
         try {
             client.publish(topic, mqttMessage);
