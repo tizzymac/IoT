@@ -5,6 +5,8 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -15,6 +17,8 @@ import com.google.gson.JsonObject;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,9 +58,16 @@ public class MainActivity extends Activity {
     private int peopleCount;
     private int peopleCount2;
 
+    // PIR
+    private Boolean[] pir1data = new Boolean[60];
+    private Boolean[] pir2data = new Boolean[60];
+
     // IoT Core
     private IotCoreCommunicator communicator;
     private Handler handler;
+
+    // TOF
+    private Handler tofHandler;
 
     // People counting flags
     AtomicBoolean under500 = new AtomicBoolean(false);
@@ -78,10 +89,12 @@ public class MainActivity extends Activity {
         peopleCount = 0;
         peopleCount2 = 0;
         firstBoard = '0';
+        Arrays.fill(pir1data, Boolean.FALSE);
+        Arrays.fill(pir2data, Boolean.FALSE);
 
-        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-        connectToOrient(boardN);
-        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
+//        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+//        connectToOrient(boardN);
+//        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
         boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
         connectToOrient(boardT);
@@ -142,11 +155,48 @@ public class MainActivity extends Activity {
         board.clearPacketData();
         board.putPacketData(bytes);
         board.setPacketDataPosition(0);
-        board.setTofTriggered(board.getPacketDataInt());
+        //board.setTofTriggered(board.getPacketDataInt());
+
+        // assumes order always the same
+        board.setPir1Triggered(board.getPacketDataShort());
+        board.setPir2Triggered(board.getPacketDataShort());
 
         if (board.isLogging()) {
+
             if (board.getCounter() % 1 == 0) {
                 runOnUiThread(() -> {
+
+                    // PIR
+                    Log.d("PIR", "1:  " + board.getPir1Triggered());
+                    Log.d("PIR", "2:  " + board.getPir2Triggered());
+
+                    if (board.getPir1Triggered() == 1) {
+                        // update the array for this minute
+                        pir1data[getCurrentMinute()] = true;
+
+                        if (getCurrentMinute() == 59) {
+                            // send this hour's data to cloud
+                            handler.post(sendPIR1Data);
+
+                            // reset array
+                            Arrays.fill(pir1data, Boolean.FALSE);
+                        }
+                    }
+                    if (board.getPir2Triggered() == 1) {
+                        // update the array for this minute
+                        pir2data[getCurrentMinute()] = true;
+
+                        if (getCurrentMinute() == 59) {
+                            // send this hour's data to cloud
+                            handler.post(sendPIR2Data);
+
+                            // reset array
+                            Arrays.fill(pir2data, Boolean.FALSE);
+                        }
+                    }
+                    /////////
+
+
                     if (board.getTag() == 't') {
 
 //                        occupancyNumberView.setText("" + board.getTofTriggered());
@@ -367,6 +417,7 @@ public class MainActivity extends Activity {
 
                 });
             }
+
             board.increaseCounter();
         }
     }
@@ -376,8 +427,57 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             communicator.connect();
+            //handler.post(sendMqttMessage);
+        }
+    };
 
-            handler.post(sendMqttMessage);
+    private final Runnable sendPIR1Data = new Runnable() {
+        @Override
+        public void run() {
+            // Get activity level
+            int activeMins = 0;
+            for (Boolean b : pir1data) {
+                if (b) {
+                    activeMins++;
+                }
+            }
+
+            String subtopic = "pir1";
+            String messageJSON = null;
+            try {
+                messageJSON = new JSONObject()
+                        .put("ActiveMins", activeMins)
+                        .put("Timestamp", new Date().getTime())
+                        .toString();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            communicator.publishMessage(subtopic, messageJSON);
+        }
+    };
+
+    private final Runnable sendPIR2Data = new Runnable() {
+        @Override
+        public void run() {
+            // Get activity level
+            int activeMins = 0;
+            for (Boolean b : pir2data) {
+                if (b) {
+                    activeMins++;
+                }
+            }
+
+            String subtopic = "pir2";
+            String messageJSON = null;
+            try {
+                messageJSON = new JSONObject()
+                        .put("ActiveMins", activeMins)
+                        .put("Timestamp", new Date().getTime())
+                        .toString();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            communicator.publishMessage(subtopic, messageJSON);
         }
     };
 
@@ -398,7 +498,8 @@ public class MainActivity extends Activity {
                 // events is the default topic for MQTT communication
                 String subtopic = "events";
                 String messageJSON = new JSONObject()
-                        .put("PeopleInRoom", ""+i++)
+                        .put("PeopleInRoom", i++)
+                        .put("Timestamp", new Date().getTime())
                         .toString();
                 communicator.publishMessage(subtopic, messageJSON);
 
@@ -417,5 +518,10 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         communicator.disconnect();
         super.onDestroy();
+    }
+
+    private int getCurrentMinute() {
+        Calendar calendar = Calendar.getInstance();
+        return calendar.get(Calendar.MINUTE);
     }
 }

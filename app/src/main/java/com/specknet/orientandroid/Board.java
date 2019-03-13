@@ -25,7 +25,8 @@ public class Board {
 
     private boolean connected = false;
 
-    private int pirTriggered;
+    private int pir1Triggered;
+    private int pir2Triggered;
     private int tofTriggered;
     private List<Integer> fiveUnder500;
     private List<Integer> threeOver100;
@@ -40,7 +41,8 @@ public class Board {
         this.tag = tag;
         this.ble_address = bleAddress;
 
-        this.pirTriggered = 2;
+        this.pir1Triggered = 2;
+        this.pir2Triggered = 2;
         this.tofTriggered = 2;
         this.fiveUnder500 = new ArrayList<>();
         this.threeOver100 = new ArrayList<>();
@@ -55,6 +57,18 @@ public class Board {
 
         this.device = rxBleClient.getBleDevice(ble_address);
     }
+
+    public void setPir1Triggered(short s) { pir1Triggered = s; }
+    public void setPir2Triggered(short s) { pir2Triggered = s; }
+
+    public int getPir1Triggered() {
+        return pir1Triggered;
+    }
+    public int getPir2Triggered() {
+        return pir2Triggered;
+    }
+
+    public short getPacketDataShort() { return packetData.getShort(); }
 
     public RxBleDevice getDevice() {
         return device;
