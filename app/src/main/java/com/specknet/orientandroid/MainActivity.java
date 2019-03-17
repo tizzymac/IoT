@@ -5,14 +5,11 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
-import android.os.Message;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.gson.JsonObject;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -61,6 +58,7 @@ public class MainActivity extends Activity {
     // PIR
     private Boolean[] pir1data = new Boolean[60];
     private Boolean[] pir2data = new Boolean[60];
+    private Boolean[] pir3data = new Boolean[60];
 
     // IoT Core
     private IotCoreCommunicator communicator;
@@ -92,16 +90,15 @@ public class MainActivity extends Activity {
         Arrays.fill(pir1data, Boolean.FALSE);
         Arrays.fill(pir2data, Boolean.FALSE);
 
-//        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-//        connectToOrient(boardN);
-//        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
+        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+        connectToOrient(boardN);
+        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
-        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
-        connectToOrient(boardT);
-        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
+//        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
+//        connectToOrient(boardT);
+//        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
         /* IoT Core Test */
-        // Setup the communication with your Google IoT Core details
         communicator = new IotCoreCommunicator.Builder()
                 .withContext(this)
                 .withCloudRegion("europe-west1")
@@ -109,7 +106,6 @@ public class MainActivity extends Activity {
                 .withRegistryId("iot_android_app")
                 .withDeviceId("test-device")
                 .withPrivateKeyRawFileId(R.raw.rsa_private)
-                //.withPrivateKeyRawFileId(R.raw.rsa_private_pkcs8)
                 .build();
         HandlerThread thread = new HandlerThread("MyBackgroundThread");
         thread.start();
@@ -160,6 +156,7 @@ public class MainActivity extends Activity {
         // assumes order always the same
         board.setPir1Triggered(board.getPacketDataShort());
         board.setPir2Triggered(board.getPacketDataShort());
+        board.setPir3Triggered(board.getPacketDataShort());
 
         if (board.isLogging()) {
 
@@ -169,30 +166,29 @@ public class MainActivity extends Activity {
                     // PIR
                     Log.d("PIR", "1:  " + board.getPir1Triggered());
                     Log.d("PIR", "2:  " + board.getPir2Triggered());
+                    Log.d("PIR", "3:  " + board.getPir3Triggered());
 
                     if (board.getPir1Triggered() == 1) {
                         // update the array for this minute
                         pir1data[getCurrentMinute()] = true;
-
-                        if (getCurrentMinute() == 59) {
-                            // send this hour's data to cloud
-                            handler.post(sendPIR1Data);
-
-                            // reset array
-                            Arrays.fill(pir1data, Boolean.FALSE);
-                        }
                     }
                     if (board.getPir2Triggered() == 1) {
                         // update the array for this minute
                         pir2data[getCurrentMinute()] = true;
+                    }
+                    if (board.getPir3Triggered() == 1) {
+                        // update the array for this minute
+                        pir3data[getCurrentMinute()] = true;
+                    }
 
-                        if (getCurrentMinute() == 59) {
-                            // send this hour's data to cloud
-                            handler.post(sendPIR2Data);
+                    if (getCurrentMinute() == 59) {
+                        // send this hour's data to cloud
+                        handler.post(sendPIRData);
 
-                            // reset array
-                            Arrays.fill(pir2data, Boolean.FALSE);
-                        }
+                        // reset array
+                        Arrays.fill(pir1data, Boolean.FALSE);
+                        Arrays.fill(pir2data, Boolean.FALSE);
+                        Arrays.fill(pir3data, Boolean.FALSE);
                     }
                     /////////
 
@@ -428,56 +424,45 @@ public class MainActivity extends Activity {
         public void run() {
             communicator.connect();
             //handler.post(sendMqttMessage);
+            handler.post(sendPIRData);
         }
     };
 
-    private final Runnable sendPIR1Data = new Runnable() {
+    private final Runnable sendPIRData = new Runnable() {
         @Override
         public void run() {
             // Get activity level
-            int activeMins = 0;
+            int activeMins1 = 0;
             for (Boolean b : pir1data) {
                 if (b) {
-                    activeMins++;
+                    activeMins1++;
                 }
             }
-
-            String subtopic = "pir1";
-            String messageJSON = null;
-            try {
-                messageJSON = new JSONObject()
-                        .put("ActiveMins", activeMins)
-                        .put("Timestamp", new Date().getTime())
-                        .toString();
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            communicator.publishMessage(subtopic, messageJSON);
-        }
-    };
-
-    private final Runnable sendPIR2Data = new Runnable() {
-        @Override
-        public void run() {
-            // Get activity level
-            int activeMins = 0;
+            int activeMins2 = 0;
             for (Boolean b : pir2data) {
                 if (b) {
-                    activeMins++;
+                    activeMins2++;
                 }
             }
-
-            String subtopic = "pir2";
-            String messageJSON = null;
-            try {
-                messageJSON = new JSONObject()
-                        .put("ActiveMins", activeMins)
-                        .put("Timestamp", new Date().getTime())
-                        .toString();
-            } catch (JSONException e) {
-                e.printStackTrace();
+            int activeMins3 = 0;
+            for (Boolean b : pir3data) {
+                if (b) {
+                    activeMins3++;
+                }
             }
-            communicator.publishMessage(subtopic, messageJSON);
+            try {
+                String subtopic = "events/pir";
+                String messageJSON = new JSONObject()
+                        .put("Timestamp", new Date().getTime())
+                        .put("PIR1Activity", activeMins1)
+                        .put("PIR2Activity", activeMins2)
+                        .put("PIR3Activity", activeMins3)
+                        .toString();
+                communicator.publishMessage(subtopic, messageJSON);
+            } catch (JSONException e) {
+                throw new IllegalStateException(e);
+            }
+
         }
     };
 
@@ -492,9 +477,7 @@ public class MainActivity extends Activity {
             if (i == 10) {
                 return;
             }
-
             try {
-
                 // events is the default topic for MQTT communication
                 String subtopic = "events";
                 String messageJSON = new JSONObject()

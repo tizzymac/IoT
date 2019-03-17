@@ -27,6 +27,7 @@ public class Board {
 
     private int pir1Triggered;
     private int pir2Triggered;
+    private int pir3Triggered;
     private int tofTriggered;
     private List<Integer> fiveUnder500;
     private List<Integer> threeOver100;
@@ -43,7 +44,9 @@ public class Board {
 
         this.pir1Triggered = 2;
         this.pir2Triggered = 2;
+        this.pir3Triggered = 2;
         this.tofTriggered = 2;
+
         this.fiveUnder500 = new ArrayList<>();
         this.threeOver100 = new ArrayList<>();
         this.counter = 0;
@@ -60,12 +63,16 @@ public class Board {
 
     public void setPir1Triggered(short s) { pir1Triggered = s; }
     public void setPir2Triggered(short s) { pir2Triggered = s; }
+    public void setPir3Triggered(short s) { pir3Triggered = s; }
 
     public int getPir1Triggered() {
         return pir1Triggered;
     }
     public int getPir2Triggered() {
         return pir2Triggered;
+    }
+    public int getPir3Triggered() {
+        return pir3Triggered;
     }
 
     public short getPacketDataShort() { return packetData.getShort(); }

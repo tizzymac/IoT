@@ -12,7 +12,6 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 public class IotCoreCommunicator {
@@ -169,6 +168,7 @@ public class IotCoreCommunicator {
     }
 
     public void publishMessage(String subtopic, String message) {
+        //Devices can publish data to separate Pub/Sub topics by specifying a subfolder in the MQTT topic
         String topic = "/devices/" + deviceId + "/" + subtopic;
         MqttMessage mqttMessage = new MqttMessage(message.getBytes());
         mqttMessage.setQos(1);
