@@ -9,26 +9,16 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.firestore.FirebaseFirestore;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity {
-
-    // Cloud
-    private FirebaseFirestore mFirestore = FirebaseFirestore.getInstance();
-    Map<String, Integer> readings_n = new HashMap<>();
-    Map<String, Integer> readings_t = new HashMap<>();
 
     private static String ORIENT_BLE_ADDRESS_t = "D3:06:E2:FD:ED:04"; //Tizzy's board 2nd semester
     private static String ORIENT_BLE_ADDRESS_n = "C9:22:1F:AA:18:54";
@@ -45,36 +35,23 @@ public class MainActivity extends Activity {
     private static final boolean raw = true;
 
     private Context ctx;
-    private TextView occupancyNumberView;
-    private TextView occupancyNumberView2;
+    private static TextView occupancyNumberView;
+    private static TextView occupancyNumberView2;
 
     // Boards
-    Board boardN;
-    Board boardT;
+    static Board board_N_PIR;   // Natasa's board
+    static Board board_T_TOF;   // Tizzy's board
 
-    private int peopleCount;
-    private int peopleCount2;
+    private static int peopleCount;
 
-    // PIR
-    private Boolean[] pir1data = new Boolean[60];
-    private Boolean[] pir2data = new Boolean[60];
-    private Boolean[] pir3data = new Boolean[60];
+    // Activity data from PIRs
+    private Boolean[] pir1ActivityData = new Boolean[60];
+    private Boolean[] pir2ActivityData = new Boolean[60];
+    private Boolean[] pir3ActivityData = new Boolean[60];
 
     // IoT Core
     private IotCoreCommunicator communicator;
     private Handler handler;
-
-    // TOF
-    private Handler tofHandler;
-
-    // People counting flags
-    AtomicBoolean under500 = new AtomicBoolean(false);
-    AtomicBoolean over1000 = new AtomicBoolean(false);
-    AtomicBoolean under500n = new AtomicBoolean(false);
-    AtomicBoolean over1000n = new AtomicBoolean(false);
-
-    // Find direction
-    char firstBoard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,18 +62,18 @@ public class MainActivity extends Activity {
         occupancyNumberView = findViewById(R.id.numberView);
         occupancyNumberView2 = findViewById(R.id.numberView2);
         peopleCount = 0;
-        peopleCount2 = 0;
-        firstBoard = '0';
-        Arrays.fill(pir1data, Boolean.FALSE);
-        Arrays.fill(pir2data, Boolean.FALSE);
+        Arrays.fill(pir1ActivityData, Boolean.FALSE);
+        Arrays.fill(pir2ActivityData, Boolean.FALSE);
 
-        boardN = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-        connectToOrient(boardN);
+        // Assumes this board used for PIRs
+        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+        connectToOrient(board_N_PIR);
         Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
-//        boardT = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
-//        connectToOrient(boardT);
-//        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
+        // Assumes this board used for TOFs
+        board_T_TOF = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
+        connectToOrient(board_T_TOF);
+        Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
         /* IoT Core Test */
         communicator = new IotCoreCommunicator.Builder()
@@ -137,7 +114,12 @@ public class MainActivity extends Activity {
                                     board.setLogging(true);
                                 });
                             }
-                            if (raw) handleRawPacket(bytes, board);
+                            if (raw) {
+                                switch (board.getTag()) {
+                                    case 'n' : handleRawPIRPacket(bytes, board);
+                                    case 't' : handleRawTOFPacket(bytes, board);
+                                }
+                            }
                         },
                         throwable -> {
                             // Handle an error here.
@@ -146,17 +128,16 @@ public class MainActivity extends Activity {
                 );
     }
 
-    private void handleRawPacket(final byte[] bytes, Board board) {
+    private void handleRawPIRPacket(final byte[] bytes, Board board) {
 
         board.clearPacketData();
         board.putPacketData(bytes);
         board.setPacketDataPosition(0);
-        //board.setTofTriggered(board.getPacketDataInt());
 
         // assumes order always the same
-        board.setPir1Triggered(board.getPacketDataShort());
-        board.setPir2Triggered(board.getPacketDataShort());
-        board.setPir3Triggered(board.getPacketDataShort());
+        board.setPirTriggered(1, board.getPacketDataShort());
+        board.setPirTriggered(2, board.getPacketDataShort());
+        board.setPirTriggered(3, board.getPacketDataShort());
 
         if (board.isLogging()) {
 
@@ -164,21 +145,21 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
 
                     // PIR
-                    Log.d("PIR", "1:  " + board.getPir1Triggered());
-                    Log.d("PIR", "2:  " + board.getPir2Triggered());
-                    Log.d("PIR", "3:  " + board.getPir3Triggered());
+                    Log.d("PIR", "1:  " + board.getPirTriggered(1));
+                    Log.d("PIR", "2:  " + board.getPirTriggered(2));
+                    Log.d("PIR", "3:  " + board.getPirTriggered(3));
 
-                    if (board.getPir1Triggered() == 1) {
+                    if (board.getPirTriggered(1) == 1) {
                         // update the array for this minute
-                        pir1data[getCurrentMinute()] = true;
+                        pir1ActivityData[getCurrentMinute()] = true;
                     }
-                    if (board.getPir2Triggered() == 1) {
+                    if (board.getPirTriggered(2) == 1) {
                         // update the array for this minute
-                        pir2data[getCurrentMinute()] = true;
+                        pir2ActivityData[getCurrentMinute()] = true;
                     }
-                    if (board.getPir3Triggered() == 1) {
+                    if (board.getPirTriggered(3) == 1) {
                         // update the array for this minute
-                        pir3data[getCurrentMinute()] = true;
+                        pir3ActivityData[getCurrentMinute()] = true;
                     }
 
                     if (getCurrentMinute() == 59) {
@@ -186,234 +167,31 @@ public class MainActivity extends Activity {
                         handler.post(sendPIRData);
 
                         // reset array
-                        Arrays.fill(pir1data, Boolean.FALSE);
-                        Arrays.fill(pir2data, Boolean.FALSE);
-                        Arrays.fill(pir3data, Boolean.FALSE);
+                        Arrays.fill(pir1ActivityData, Boolean.FALSE);
+                        Arrays.fill(pir2ActivityData, Boolean.FALSE);
+                        Arrays.fill(pir3ActivityData, Boolean.FALSE);
                     }
-                    /////////
-
-
-                    if (board.getTag() == 't') {
-
-//                        occupancyNumberView.setText("" + board.getTofTriggered());
-//                    }
-
-                        // ******************************************
-                        // at least 5 readings under 500 followed by
-                        // Check for readings > 1000 three in a row
-                        // TODO in what time period??
-
-                        Log.d("READING_t", "" + board.getTofTriggered());
-                        if (under500.get()) {
-
-                            if (over1000.get()) {
-
-                                // Looking for readings over 1000, smaller reading found
-                                if ((board.getTofTriggered() < 1000)) {
-                                    // person not counted
-                                    // reset
-                                    board.resetFiveList();
-                                    board.resetThreeList();
-                                    over1000.set(false);
-                                    under500.set(false);
-
-                                    Log.d("STATE_t", "A");
-                                }
-
-                                // Looking for readings over 1000, reading found
-                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() < 3)) {
-                                    board.addThreeReading();
-
-                                    Log.d("STATE_t", "B");
-                                }
-
-                                // Just need one more reading over 1000
-                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
-//                                    // Count a person!
-//                                    peopleCount++;
-//                                    occupancyNumberView.setText("" + peopleCount);
-
-                                    // Find direction
-                                    if (firstBoard == 'n') {
-                                        // Count a person!
-                                        peopleCount++;
-                                        occupancyNumberView.setText("" + peopleCount);
-                                        occupancyNumberView2.setText("in");
-
-                                        // Send data to cloud
-                                        String subtopic = "events"; // events is the default topic for MQTT communication
-                                        String message = "Person entered";
-                                        communicator.publishMessage(subtopic, message);
-
-                                        firstBoard = '0';
-                                    } else {
-                                        firstBoard = 't';
-                                        // wait for second board to increase reading
-                                    }
-
-                                    // reset
-                                    board.resetFiveList();
-                                    board.resetThreeList();
-                                    over1000.set(false);
-                                    under500.set(false);
-
-                                    Log.d("STATE_t", "C");
-                                }
-                            } else {
-
-                                // Adding readings under 500
-                                if ((board.getTofTriggered() < 500) && (board.getFiveSize() < 4)) {
-                                    board.addFiveReading();
-
-                                    Log.d("STATE_t", "D");
-                                }
-
-                                // Looking for readings under 500 but larger reading seen -> reset
-                                if ((board.getTofTriggered() > 1000) && (board.getFiveSize() < 4)) {
-                                    under500.set(false);
-                                    board.resetFiveList();
-
-                                    Log.d("STATE_t", "E");
-                                }
-
-                                // After 5 readings under 500 reached, reading over 1000 seen
-                                if ((board.getFiveSize() >= 4) && (board.getTofTriggered() > 1000)) {
-                                    // switch to counting threes
-                                    over1000.set(true);
-                                    board.addThreeReading();
-
-                                    Log.d("STATE_t", "F");
-                                }
-                            }
-
-                        } else {
-                            // initial
-                            if ((board.getTofTriggered() < 500) && (board.getFiveSize() == 0)) {
-                                under500.set(true);
-                                board.addFiveReading();
-
-                                Log.d("STATE", "G");
-                            }
-                        }
-
-                    } else { // tag == 'n'
-
-                        Log.d("READING_n", "" + board.getTofTriggered());
-                        if (under500n.get()) {
-
-                            if (over1000n.get()) {
-
-                                // Looking for readings over 1000, smaller reading found
-                                if ((board.getTofTriggered() < 1000)) {
-                                    // person not counted
-                                    // reset
-                                    board.resetFiveList();
-                                    board.resetThreeList();
-                                    over1000n.set(false);
-                                    under500n.set(false);
-
-                                    Log.d("STATE_n", "A");
-                                }
-
-                                // Looking for readings over 1000, reading found
-                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() < 3)) {
-                                    board.addThreeReading();
-
-                                    Log.d("STATE_n", "B");
-                                }
-
-                                // Just need one more reading over 1000
-                                if ((board.getTofTriggered() > 1000) && (board.getThreeSize() >= 3)) {
-//                                    // Count a person!
-//                                    peopleCount2++;
-//                                    occupancyNumberView2.setText("" + peopleCount2);
-
-                                    // Find direction
-                                    if (firstBoard == 't') {
-                                        // Count a person!
-                                        peopleCount--;
-                                        occupancyNumberView.setText("" + peopleCount);
-                                        occupancyNumberView2.setText("out");
-
-                                        // Send data to cloud
-                                        String subtopic = "events"; // events is the default topic for MQTT communication
-                                        String message = "Person exited";
-                                        communicator.publishMessage(subtopic, message);
-
-                                        firstBoard = '0';
-                                    } else {
-                                        firstBoard = 'n';
-                                        // wait for second board to increase reading
-                                    }
-
-                                    // reset
-                                    board.resetFiveList();
-                                    board.resetThreeList();
-                                    over1000n.set(false);
-                                    under500n.set(false);
-
-                                    Log.d("STATE_n", "C");
-                                }
-                            } else {
-
-                                // Adding readings under 500
-                                if ((board.getTofTriggered() < 500) && (board.getFiveSize() < 4)) {
-                                    board.addFiveReading();
-
-                                    Log.d("STATE_n", "D");
-                                }
-
-                                // Looking for readings under 500 but larger reading seen -> reset
-                                if ((board.getTofTriggered() > 1000) && (board.getFiveSize() < 4)) {
-                                    under500n.set(false);
-                                    board.resetFiveList();
-
-                                    Log.d("STATE_n", "E");
-                                }
-
-                                // After 5 readings under 500 reached, reading over 1000 seen
-                                if ((board.getFiveSize() >= 4) && (board.getTofTriggered() > 1000)) {
-                                    // switch to counting threes
-                                    over1000n.set(true);
-                                    board.addThreeReading();
-
-                                    Log.d("STATE_n", "F");
-                                }
-                            }
-
-                        } else {
-                            // initial
-                            if ((board.getTofTriggered() < 500) && (board.getFiveSize() == 0)) {
-                                under500n.set(true);
-                                board.addFiveReading();
-
-                                Log.d("STATE", "G");
-                            }
-                        }
-                    }
-                    // ************************
-
-                    switch (board.getTag()) {
-                        case ('n') :
-                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 500) && (board.getTofTriggered() > 0)) {
-                                readings_n.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
-                                mFirestore.collection("TOF_readings")
-                                        .document(ORIENT_BLE_ADDRESS_n)
-                                        .set(readings_n);
-                            }
-                        case ('t') :
-                            if ((Math.abs(board.getTofTriggered() - board.getLastReading()) > 5) && (board.getTofTriggered() < 500) && (board.getTofTriggered() > 0)) {
-                                readings_t.put(String.valueOf(new Date().getTime()), board.getTofTriggered());
-                                mFirestore.collection("TOF_readings")
-                                        .document(ORIENT_BLE_ADDRESS_t)
-                                        .set(readings_t);
-                            }
-                    }
-                    board.setLastReading(board.getTofTriggered());
-
                 });
             }
+        }
+    }
 
+    private void handleRawTOFPacket(final byte[] bytes, Board board) {
+
+        board.clearPacketData();
+        board.putPacketData(bytes);
+        board.setPacketDataPosition(0);
+
+        board.setTofTriggered(1, board.getPacketDataInt());
+        board.setTofTriggered(2, board.getPacketDataInt());
+
+        if (board.isLogging()) {
+
+            if (board.getCounter() % 1 == 0) {
+                runOnUiThread(() -> {
+                    // Do we even need this?
+                });
+            }
             board.increaseCounter();
         }
     }
@@ -433,19 +211,19 @@ public class MainActivity extends Activity {
         public void run() {
             // Get activity level
             int activeMins1 = 0;
-            for (Boolean b : pir1data) {
+            for (Boolean b : pir1ActivityData) {
                 if (b) {
                     activeMins1++;
                 }
             }
             int activeMins2 = 0;
-            for (Boolean b : pir2data) {
+            for (Boolean b : pir2ActivityData) {
                 if (b) {
                     activeMins2++;
                 }
             }
             int activeMins3 = 0;
-            for (Boolean b : pir3data) {
+            for (Boolean b : pir3ActivityData) {
                 if (b) {
                     activeMins3++;
                 }
@@ -506,5 +284,21 @@ public class MainActivity extends Activity {
     private int getCurrentMinute() {
         Calendar calendar = Calendar.getInstance();
         return calendar.get(Calendar.MINUTE);
+    }
+
+    public static void personEnters() {
+        peopleCount++;
+        occupancyNumberView.setText("" + peopleCount);
+        occupancyNumberView2.setText("in");
+
+        // Send data to cloud
+    }
+
+    public static void personExits() {
+        peopleCount--;
+        occupancyNumberView.setText("" + peopleCount);
+        occupancyNumberView2.setText("out");
+
+        // Send data to cloud
     }
 }

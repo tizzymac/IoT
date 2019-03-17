@@ -7,8 +7,6 @@ import com.polidea.rxandroidble2.RxBleDevice;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Board {
 
@@ -18,22 +16,20 @@ public class Board {
 
     // Bluetooth
     private static String ble_address;
-    private static final boolean raw = true;
     private RxBleDevice device;
     private RxBleClient rxBleClient;
     private ByteBuffer packetData;
 
     private boolean connected = false;
 
-    private int pir1Triggered;
-    private int pir2Triggered;
-    private int pir3Triggered;
-    private int tofTriggered;
-    private List<Integer> fiveUnder500;
-    private List<Integer> threeOver100;
+    // Sensors
+    private int[] pirTriggered = {2,2,2};
+    private TOFSensor tof1;
+    private TOFSensor tof2;
+
     private int counter;
     private boolean logging;
-    private int lastReading;
+    private int firstSensor;
 
     private char tag;
 
@@ -42,16 +38,12 @@ public class Board {
         this.tag = tag;
         this.ble_address = bleAddress;
 
-        this.pir1Triggered = 2;
-        this.pir2Triggered = 2;
-        this.pir3Triggered = 2;
-        this.tofTriggered = 2;
+        this.tof1 = new TOFSensor(1);
+        this.tof2 = new TOFSensor(2);
 
-        this.fiveUnder500 = new ArrayList<>();
-        this.threeOver100 = new ArrayList<>();
         this.counter = 0;
         this.logging = false;
-        this.lastReading = 0;
+        this.firstSensor = 0;
 
         this.packetData = ByteBuffer.allocate(18);
         this.packetData.order(ByteOrder.LITTLE_ENDIAN);
@@ -61,56 +53,14 @@ public class Board {
         this.device = rxBleClient.getBleDevice(ble_address);
     }
 
-    public void setPir1Triggered(short s) { pir1Triggered = s; }
-    public void setPir2Triggered(short s) { pir2Triggered = s; }
-    public void setPir3Triggered(short s) { pir3Triggered = s; }
-
-    public int getPir1Triggered() {
-        return pir1Triggered;
-    }
-    public int getPir2Triggered() {
-        return pir2Triggered;
-    }
-    public int getPir3Triggered() {
-        return pir3Triggered;
-    }
+    // PIRs
+    public void setPirTriggered(int id, short s) { pirTriggered[id] = s; }
+    public int getPirTriggered(int id) { return pirTriggered[id]; }
 
     public short getPacketDataShort() { return packetData.getShort(); }
 
     public RxBleDevice getDevice() {
         return device;
-    }
-
-    public void resetFiveList() {
-        this.fiveUnder500 = new ArrayList<>();
-    }
-
-    public void addFiveReading() {
-        fiveUnder500.add(tofTriggered);
-    }
-
-    public int getFiveSize() {
-        return fiveUnder500.size();
-    }
-
-    public void resetThreeList() {
-        this.threeOver100 = new ArrayList<>();
-    }
-
-    public void addThreeReading() {
-        threeOver100.add(tofTriggered);
-    }
-
-    public int getThreeSize() {
-        return threeOver100.size();
-    }
-
-    public static String getBleAddress() {
-        return ble_address;
-    }
-
-    public void setLastReading(int lastReading) {
-        this.lastReading = lastReading;
     }
 
     public void increaseCounter() {
@@ -131,8 +81,19 @@ public class Board {
         packetData.position(i);
     }
 
-    public void setTofTriggered(int tofTriggered) {
-        this.tofTriggered = tofTriggered;
+    public void setTofTriggered(int i, int t) {
+        switch (i) {
+            case 1 : this.tof1.setTofTriggered(t);
+            case 2 : this.tof2.setTofTriggered(t);
+        }
+    }
+
+    public int getTofTriggered(int i) {
+        switch (i) {
+            case 1 : return this.tof1.getTofTriggered();
+            case 2 : return this.tof2.getTofTriggered();
+            default: return -1;
+        }
     }
 
     public char getTag() {
@@ -147,10 +108,6 @@ public class Board {
         this.connected = connected;
     }
 
-    public int getTofTriggered() {
-        return tofTriggered;
-    }
-
     public int getCounter() {
         return counter;
     }
@@ -163,7 +120,29 @@ public class Board {
         this.logging = logging;
     }
 
-    public int getLastReading() {
-        return lastReading;
+    public void personPassed(int boardID) {
+        // Find direction
+
+        if (boardID == 1) {
+            if (firstSensor == 2) {
+                // Count a person!
+                MainActivity.personEnters();
+                firstSensor = 0;
+            } else {
+                firstSensor = 1;
+                // wait for other board to count person
+            }
+        }
+
+        if (boardID == 2) {
+            if (firstSensor == 1) {
+                // Count a person!
+                MainActivity.personExits();
+                firstSensor = 0;
+            } else {
+                firstSensor = 2;
+                // wait for other board to count person
+            }
+        }
     }
 }
