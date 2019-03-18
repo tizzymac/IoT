@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
 
-    private static String ORIENT_BLE_ADDRESS_t = "D3:06:E2:FD:ED:04"; //Tizzy's board 2nd semester
-    private static String ORIENT_BLE_ADDRESS_n = "C9:22:1F:AA:18:54";
+    private static String ORIENT_BLE_ADDRESS_t = "D3:06:E2:FD:ED:04"; // Tizzy's board 2nd semester
+    private static String ORIENT_BLE_ADDRESS_n = "C9:22:1F:AA:18:54"; // Natasa's board
 
     //characteristics for the board
     private static final String ORIENT_QUAT_CHARACTERISTIC = "0000a001-0000-1000-8000-00805f9b34fb";
@@ -50,8 +50,8 @@ public class MainActivity extends Activity {
     private Boolean[] pir3ActivityData = new Boolean[60];
 
     // IoT Core
-    private IotCoreCommunicator communicator;
-    private Handler handler;
+    private static IotCoreCommunicator communicator;
+    private static Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,7 +75,7 @@ public class MainActivity extends Activity {
         connectToOrient(board_T_TOF);
         Toast.makeText(ctx, "Connecting to t", Toast.LENGTH_SHORT).show();
 
-        /* IoT Core Test */
+        // IoT Core Test
         communicator = new IotCoreCommunicator.Builder()
                 .withContext(this)
                 .withCloudRegion("europe-west1")
@@ -88,8 +88,8 @@ public class MainActivity extends Activity {
         thread.start();
         handler = new Handler(thread.getLooper());
         handler.post(connectOffTheMainThread); // Use whatever threading mechanism you want
-        /* *** */
 
+        // TODO: People count need to be read in from cloud at start?
     }
 
     private void connectToOrient(Board board) {
@@ -107,15 +107,15 @@ public class MainActivity extends Activity {
                         bytes -> {
                             if (!board.isConnected()) {
                                 board.setConnected(true);
-                                System.out.println("Connected to " + board.getTag());
+                                System.out.println("Connected to " + board.getBoardID());
                                 runOnUiThread(() -> {
-                                    Toast.makeText(ctx, "Receiving sensor data from " + board.getTag(),
+                                    Toast.makeText(ctx, "Receiving sensor data from " + board.getBoardID(),
                                            Toast.LENGTH_SHORT).show();
                                     board.setLogging(true);
                                 });
                             }
                             if (raw) {
-                                switch (board.getTag()) {
+                                switch (board.getBoardID()) {
                                     case 'n' : handleRawPIRPacket(bytes, board);
                                     case 't' : handleRawTOFPacket(bytes, board);
                                 }
@@ -130,9 +130,7 @@ public class MainActivity extends Activity {
 
     private void handleRawPIRPacket(final byte[] bytes, Board board) {
 
-        board.clearPacketData();
         board.putPacketData(bytes);
-        board.setPacketDataPosition(0);
 
         // assumes order always the same
         board.setPirTriggered(1, board.getPacketDataShort());
@@ -178,12 +176,11 @@ public class MainActivity extends Activity {
 
     private void handleRawTOFPacket(final byte[] bytes, Board board) {
 
-        board.clearPacketData();
         board.putPacketData(bytes);
-        board.setPacketDataPosition(0);
 
-        board.setTofTriggered(1, board.getPacketDataInt());
-        board.setTofTriggered(2, board.getPacketDataInt());
+        // Assumes order is correct
+        board.tofTriggered(1, board.getPacketDataInt());
+        board.tofTriggered(2, board.getPacketDataInt());
 
         if (board.isLogging()) {
 
@@ -194,6 +191,24 @@ public class MainActivity extends Activity {
             }
             board.increaseCounter();
         }
+    }
+
+    public static void personEnters() {
+        peopleCount++;
+        occupancyNumberView.setText("" + peopleCount);
+        occupancyNumberView2.setText("in");
+
+        // Send data to cloud
+        handler.post(updatePeopleCount);
+    }
+
+    public static void personExits() {
+        peopleCount--;
+        occupancyNumberView.setText("" + peopleCount);
+        occupancyNumberView2.setText("out");
+
+        // Send data to cloud
+        handler.post(updatePeopleCount);
     }
 
     /* IoT Core bits */
@@ -244,6 +259,23 @@ public class MainActivity extends Activity {
         }
     };
 
+    private static final Runnable updatePeopleCount = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                String subtopic = "events"; // use default subtopic
+                String messageJSON = new JSONObject()
+                        .put("PeopleInRoom", peopleCount)
+                        .put("Timestamp", new Date().getTime())
+                        .toString();
+                communicator.publishMessage(subtopic, messageJSON);
+            } catch (JSONException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    };
+
+    // Just for testing
     private final Runnable sendMqttMessage = new Runnable() {
         private int i;
 
@@ -286,19 +318,5 @@ public class MainActivity extends Activity {
         return calendar.get(Calendar.MINUTE);
     }
 
-    public static void personEnters() {
-        peopleCount++;
-        occupancyNumberView.setText("" + peopleCount);
-        occupancyNumberView2.setText("in");
 
-        // Send data to cloud
-    }
-
-    public static void personExits() {
-        peopleCount--;
-        occupancyNumberView.setText("" + peopleCount);
-        occupancyNumberView2.setText("out");
-
-        // Send data to cloud
-    }
 }
