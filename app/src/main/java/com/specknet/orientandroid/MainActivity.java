@@ -9,6 +9,8 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.polidea.rxandroidble2.exceptions.BleDisconnectedException;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -17,6 +19,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import io.reactivex.Observable;
 
 public class MainActivity extends Activity {
 
@@ -66,9 +70,9 @@ public class MainActivity extends Activity {
         Arrays.fill(pir2ActivityData, Boolean.FALSE);
 
         // Assumes this board used for PIRs
-        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-        connectToOrient(board_N_PIR);
-        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
+//        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+//        connectToOrient(board_N_PIR);
+//        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
         // Assumes this board used for TOFs
         board_T_TOF = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
@@ -90,6 +94,8 @@ public class MainActivity extends Activity {
         handler.post(connectOffTheMainThread); // Use whatever threading mechanism you want
 
         // TODO: People count need to be read in from cloud at start?
+
+        // TODO: catch BleDisconnectedException
     }
 
     private void connectToOrient(Board board) {
@@ -103,6 +109,16 @@ public class MainActivity extends Activity {
                     // Notification has been set up
                 })
                 .flatMap(notificationObservable -> notificationObservable) // <-- Notification has been set up, now observe value changes.
+                .retryWhen(errors -> errors.flatMap(error -> {
+                    if (error instanceof BleDisconnectedException) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(ctx, "Reconnecting...", Toast.LENGTH_LONG).show();
+                                });
+                        Log.d("OrientAndroid", "Trying to reconnect...");
+                        return Observable.just(new Object());
+                    }
+                    return Observable.error(error);
+                }))
                 .subscribe(
                         bytes -> {
                             if (!board.isConnected()) {
@@ -124,6 +140,8 @@ public class MainActivity extends Activity {
                         throwable -> {
                             // Handle an error here.
                             Log.e("OrientAndroid", "Error: " + throwable.toString());
+
+
                         }
                 );
     }
@@ -182,15 +200,16 @@ public class MainActivity extends Activity {
         board.tofTriggered(1, board.getPacketDataInt());
         board.tofTriggered(2, board.getPacketDataInt());
 
-        if (board.isLogging()) {
-
-            if (board.getCounter() % 1 == 0) {
-                runOnUiThread(() -> {
-                    // Do we even need this?
-                });
-            }
-            board.increaseCounter();
-        }
+        // TODO: Delete this?
+//        if (board.isLogging()) {
+//
+//            if (board.getCounter() % 1 == 0) {
+//                runOnUiThread(() -> {
+//                    // Do we even need this?
+//                });
+//            }
+//            board.increaseCounter();
+//        }
     }
 
     public static void personEnters() {
@@ -199,7 +218,7 @@ public class MainActivity extends Activity {
         occupancyNumberView2.setText("in");
 
         // Send data to cloud
-        handler.post(updatePeopleCount);
+        //handler.post(updatePeopleCount);
     }
 
     public static void personExits() {
@@ -208,7 +227,7 @@ public class MainActivity extends Activity {
         occupancyNumberView2.setText("out");
 
         // Send data to cloud
-        handler.post(updatePeopleCount);
+        //handler.post(updatePeopleCount);
     }
 
     /* IoT Core bits */
@@ -217,7 +236,6 @@ public class MainActivity extends Activity {
         public void run() {
             communicator.connect();
             //handler.post(sendMqttMessage);
-            handler.post(sendPIRData);
         }
     };
 
