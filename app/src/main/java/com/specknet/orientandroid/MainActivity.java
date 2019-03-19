@@ -43,13 +43,6 @@ public class MainActivity extends Activity {
     private Context ctx;
     private static TextView occupancyNumberView;
 
-    // Heatmap
-    private Button area1;
-    private Button area2;
-    private Button area3;
-    private Button area4;
-    private Button area5;
-
     // Boards
     static Board board_N_PIR;   // Natasa's board
     static Board board_T_TOF;   // Tizzy's board
@@ -57,9 +50,11 @@ public class MainActivity extends Activity {
     private static int peopleCount;
 
     // Activity data from PIRs
-    private Boolean[] pir1ActivityData = new Boolean[20];
-    private Boolean[] pir2ActivityData = new Boolean[20];
-    private Boolean[] pir3ActivityData = new Boolean[20];
+    int pirActivityTimeWindow = 20;
+    private Boolean[][] pirActivityData = new Boolean[5][pirActivityTimeWindow];
+
+    // Heatmap
+    private Button[] heatmapAreas = new Button[5];
     private Boolean windowReached;
 
     // IoT Core
@@ -75,17 +70,17 @@ public class MainActivity extends Activity {
         occupancyNumberView = findViewById(R.id.numberView);
         peopleCount = 0;
 
-        // Activity levels
-        Arrays.fill(pir1ActivityData, Boolean.FALSE);
-        Arrays.fill(pir2ActivityData, Boolean.FALSE);
-        Arrays.fill(pir3ActivityData, Boolean.FALSE);
+        // Initialize activity levels
+        for (int i = 0; i < 5; i++) {
+            Arrays.fill(pirActivityData[i], Boolean.FALSE);
+        }
 
         // Heatmap
-        area1 = findViewById(R.id.area1);
-        area2 = findViewById(R.id.area2);
-        area3 = findViewById(R.id.area3);
-        area4 = findViewById(R.id.area4);
-        area5 = findViewById(R.id.area5);
+        heatmapAreas[0] = findViewById(R.id.area1);
+        heatmapAreas[1] = findViewById(R.id.area2);
+        heatmapAreas[2] = findViewById(R.id.area3);
+        heatmapAreas[3] = findViewById(R.id.area4);
+        heatmapAreas[4] = findViewById(R.id.area5);
 
         // Assumes this board used for PIRs
         board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
@@ -166,53 +161,46 @@ public class MainActivity extends Activity {
 
             board.putPacketData(bytes);
 
-            // assumes order always the same
-            board.setPirTriggered(1, board.getPacketDataShort());
-            board.setPirTriggered(2, board.getPacketDataShort());
-            board.setPirTriggered(3, board.getPacketDataShort());
+            int numAreasCurrentlyActive = 0;
+            for (int i = 0; i < 5; i++) {
+                board.setPirTriggered(i+1, board.getPacketDataShort());
+                Log.d("PIR", (i+1) + ":  " + board.getPirTriggered(i+1));
 
-            // PIR
-            Log.d("PIR", "1:  " + board.getPirTriggered(1));
-            Log.d("PIR", "2:  " + board.getPirTriggered(2));
-            Log.d("PIR", "3:  " + board.getPirTriggered(3));
-
-            if (board.getPirTriggered(1) == 1) {
-                // update the array for this minute
-                pir1ActivityData[(getCurrentMinute()%20)] = true;
+                if (board.getPirTriggered(i+1) == 1) {
+                    // update the array for this minute
+                    pirActivityData[i][(getCurrentMinute() % pirActivityTimeWindow)] = true;
+                    numAreasCurrentlyActive++;
+                }
             }
-            Log.d("PIR", "Activity 1:" + getActivityLevel(pir1ActivityData));
 
-            if (board.getPirTriggered(2) == 1) {
-                // update the array for this minute
-                pir2ActivityData[(getCurrentMinute()%20)] = true;
-            }
-            Log.d("PIR", "Activity 2:" + getActivityLevel(pir2ActivityData));
+            // Check activity level against people count
+            peopleCount = (peopleCount < numAreasCurrentlyActive) ? numAreasCurrentlyActive : peopleCount;
 
-            if (board.getPirTriggered(3) == 1) {
-                // update the array for this minute
-                pir3ActivityData[(getCurrentMinute()%20)] = true;
-            }
-            Log.d("PIR", "Activity 3:" + getActivityLevel(pir3ActivityData));
-
-            // update heatmap
+            // Update heatmap
             updateHeatMap();
 
-            // Window size: 20 mins
-            if ((getCurrentMinute()%20) == 0) {
+            if ((getCurrentMinute() % pirActivityTimeWindow) == 0) {
                 if (windowReached) {
+
+                    // If no activity at all, reset people counter to 0
+                    int totalActivityLevel = 0;
+                    for (Boolean[] b : pirActivityData) {
+                        totalActivityLevel += getActivityLevel(b);
+                    }
+                    peopleCount = (totalActivityLevel < 0) ? 0 : peopleCount;
 
                     // send this time window's data to cloud
                     Log.d("CLOUD", "Sending PIR data to cloud");
                     handler.post(sendPIRData);
 
                     // reset array
-                    Arrays.fill(pir1ActivityData, Boolean.FALSE);
-                    Arrays.fill(pir2ActivityData, Boolean.FALSE);
-                    Arrays.fill(pir3ActivityData, Boolean.FALSE);
+                    for (Boolean[] b : pirActivityData) {
+                        Arrays.fill(b, Boolean.FALSE);
+                    }
                 }
                 windowReached = false;
             }
-            if (((getCurrentMinute()%20) == 19)) {
+            if (((getCurrentMinute() % pirActivityTimeWindow) == pirActivityTimeWindow-1)) {
                 windowReached = true;
             }
         }
@@ -246,7 +234,7 @@ public class MainActivity extends Activity {
 
     public static void personExits() {
         peopleCount--;
-        Log.d("TOF_READING", "Person enters. People count: " + peopleCount);
+        Log.d("TOF_READING", "Person exits. People count: " + peopleCount);
 
 //        occupancyNumberView.setText("" + peopleCount);
 
@@ -271,9 +259,11 @@ public class MainActivity extends Activity {
                 String subtopic = "events/pir";
                 String messageJSON = new JSONObject()
                         .put("Timestamp", new Date().getTime())
-                        .put("PIR1Activity", getActivityLevel(pir1ActivityData))
-                        //.put("PIR2Activity", getActivityLevel(pir2ActivityData))
-                        .put("PIR3Activity", getActivityLevel(pir3ActivityData))
+                        .put("PIR1Activity", getActivityLevel(pirActivityData[0]))
+                        //.put("PIR2Activity", getActivityLevel(pirActivityData[1]))
+                        .put("PIR3Activity", getActivityLevel(pirActivityData[2]))
+                        .put("PIR4Activity", getActivityLevel(pirActivityData[3]))
+                        .put("PIR5Activity", getActivityLevel(pirActivityData[4]))
                         .toString();
                 communicator.publishMessage(subtopic, messageJSON);
             } catch (JSONException e) {
@@ -345,10 +335,9 @@ public class MainActivity extends Activity {
     // PIR Activity
     private void updateHeatMap() {
         runOnUiThread(() -> {
-            area1.setBackgroundColor(getActivityColor(getActivityLevel(pir1ActivityData)));
-            area2.setBackgroundColor(getActivityColor(getActivityLevel(pir2ActivityData)));
-            area3.setBackgroundColor(getActivityColor(getActivityLevel(pir3ActivityData)));
-
+            for (int i = 0; i < 5; i++) {
+                heatmapAreas[i].setBackgroundColor(getActivityColor(getActivityLevel(pirActivityData[i])));
+            }
         });
     }
 
@@ -363,7 +352,7 @@ public class MainActivity extends Activity {
     }
 
     private int getActivityColor(int activityLevel) {
-        int a = activityLevel/2;
+        int a = activityLevel*2;
         switch (a) {
             case 0: return ContextCompat.getColor(this, R.color.activity0);
             case 1: return ContextCompat.getColor(this, R.color.activity1);

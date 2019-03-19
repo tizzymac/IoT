@@ -24,7 +24,7 @@ public class Board {
     private boolean connected = false;
 
     // Sensors
-    private int[] pirTriggered = {2,2,2};
+    private int[] pirTriggered = {2,2,2,2,2};
     private TOFSensor tof1;
     private TOFSensor tof2;
 
@@ -104,7 +104,6 @@ public class Board {
         if (boardID == 1) {
             if (firstSensor == 2) {
                 // Count a person!
-
                 MainActivity.personEnters();
                 firstSensor = 0;
             } else {

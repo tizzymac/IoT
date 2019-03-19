@@ -16,10 +16,10 @@ public class TOFSensor {
     private List<Integer> nOverY;
 
     // Thresholds
-    int X = 500;
+    int X = 600;
     int Y = 800;
     int m = 2;
-    int n = 3;
+    int n = 2;
 
     // People counting flags
     AtomicBoolean underX = new AtomicBoolean(false);
