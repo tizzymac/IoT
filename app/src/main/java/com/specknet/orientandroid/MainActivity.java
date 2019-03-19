@@ -82,10 +82,10 @@ public class MainActivity extends Activity {
         heatmapAreas[3] = findViewById(R.id.area4);
         heatmapAreas[4] = findViewById(R.id.area5);
 
-        // Assumes this board used for PIRs
-        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-        connectToOrient(board_N_PIR);
-        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
+//        // Assumes this board used for PIRs
+//        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+//        connectToOrient(board_N_PIR);
+//        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
         // Assumes this board used for TOFs
         board_T_TOF = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
@@ -221,8 +221,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static void personEnters() {
-        peopleCount++;
+    public static void personEnters(int numPeople) {
+        peopleCount += numPeople;
         Log.d("TOF_READING", "Person enters. People count: " + peopleCount);
 
 //        occupancyNumberView.setText("" + peopleCount);
@@ -232,8 +232,8 @@ public class MainActivity extends Activity {
         handler.post(sendPeopleCount);
     }
 
-    public static void personExits() {
-        peopleCount--;
+    public static void personExits(int numPeople) {
+        peopleCount = (peopleCount-numPeople < 0) ? 0 : peopleCount-numPeople;
         Log.d("TOF_READING", "Person exits. People count: " + peopleCount);
 
 //        occupancyNumberView.setText("" + peopleCount);
@@ -248,7 +248,10 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             communicator.connect();
+
+            // TEST
             //handler.post(sendMqttMessage);
+            //handler.post(sendPIRData);
         }
     };
 
@@ -260,7 +263,7 @@ public class MainActivity extends Activity {
                 String messageJSON = new JSONObject()
                         .put("Timestamp", new Date().getTime())
                         .put("PIR1Activity", getActivityLevel(pirActivityData[0]))
-                        //.put("PIR2Activity", getActivityLevel(pirActivityData[1]))
+                        .put("PIR2Activity", getActivityLevel(pirActivityData[1]))
                         .put("PIR3Activity", getActivityLevel(pirActivityData[2]))
                         .put("PIR4Activity", getActivityLevel(pirActivityData[3]))
                         .put("PIR5Activity", getActivityLevel(pirActivityData[4]))

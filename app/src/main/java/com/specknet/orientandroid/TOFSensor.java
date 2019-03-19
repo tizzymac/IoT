@@ -3,6 +3,7 @@ package com.specknet.orientandroid;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,8 +43,13 @@ public class TOFSensor {
 
     public void processReading(int reading) {
         Log.d("TOF_READING_"+id, "" + reading);
-        if (underX.get()) {
 
+        // Check if two people are passing
+        if (reading < 200) {
+            Board.twoPeoplePassing(id, new Date().getTime());
+        }
+
+        if (underX.get()) {
             if (overY.get()) {
 
                 // Looking for readings over Y, smaller reading found

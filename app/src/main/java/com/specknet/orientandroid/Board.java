@@ -28,7 +28,11 @@ public class Board {
     private TOFSensor tof1;
     private TOFSensor tof2;
 
-    private int counter;
+    // Two people
+    private static long time_2P;
+    private static int firstSensor_2P;
+    private static boolean twoPeople;
+
     private boolean logging;
     private int firstSensor;
 
@@ -40,9 +44,12 @@ public class Board {
         this.tof1 = new TOFSensor(1);
         this.tof2 = new TOFSensor(2);
 
-        this.counter = 0;
         this.logging = false;
         this.firstSensor = 0;
+
+        time_2P = 0;
+        firstSensor_2P = 0;
+        twoPeople = false;
 
         this.packetData = ByteBuffer.allocate(18);
         this.packetData.order(ByteOrder.LITTLE_ENDIAN);
@@ -88,13 +95,14 @@ public class Board {
     // PIRs
     public void setPirTriggered(int id, short s) { pirTriggered[id-1] = s; }
     public int getPirTriggered(int id) { return pirTriggered[id-1]; }
-    // ***
 
     // TOFs
     public void tofTriggered(int tofID, int value) {
         switch (tofID) {
             case 1 : this.tof1.setTofTriggered(value);
+                     break;
             case 2 : this.tof2.setTofTriggered(value);
+                     break;
         }
     }
     public void personPassed(int boardID) {
@@ -103,8 +111,16 @@ public class Board {
 
         if (boardID == 1) {
             if (firstSensor == 2) {
-                // Count a person!
-                MainActivity.personEnters();
+                // Check if it's two people
+                if (twoPeople) {
+                    // Count 2 people
+                    Log.d("TOF_READING", "Two People");
+                    MainActivity.personEnters(2);
+                    twoPeople = false;
+                } else {
+                    // Count a person!
+                    MainActivity.personEnters(1);
+                }
                 firstSensor = 0;
             } else {
                 firstSensor = 1;
@@ -114,8 +130,16 @@ public class Board {
 
         if (boardID == 2) {
             if (firstSensor == 1) {
-                // Count a person!
-                MainActivity.personExits();
+                // Check if it's two people
+                if (twoPeople) {
+                    // Count 2 people
+                    Log.d("TOF_READING", "Two People");
+                    MainActivity.personExits(2);
+                    twoPeople = false;
+                } else {
+                    // Count a person!
+                    MainActivity.personExits(1);
+                }
                 firstSensor = 0;
             } else {
                 firstSensor = 2;
@@ -124,10 +148,28 @@ public class Board {
         }
     }
 
-    public void increaseCounter() {
-        counter++;
-    }
-    public int getCounter() {
-        return counter;
+    public static void twoPeoplePassing(int boardID, long time) {
+        // If both boards display reading of < 200 at the same time
+        // it's likely that two people are passing through the door at the same time
+
+        if (!twoPeople) {
+            if (firstSensor_2P == 0) {
+                firstSensor_2P = boardID;
+                time_2P = time;
+            } else {
+                if (firstSensor_2P == boardID) {
+                    //
+                } else {
+                    if ((time < time_2P + 5) && (time > time_2P - 5)) {
+                        // If times are within 5 milliseconds
+                        // Count two people
+                        twoPeople = true;
+                    }
+                }
+                // reset
+                firstSensor_2P = 0;
+                time_2P = 0;
+            }
+        }
     }
 }
