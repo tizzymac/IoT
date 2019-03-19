@@ -8,6 +8,7 @@ import com.polidea.rxandroidble2.RxBleDevice;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Date;
 
 public class Board {
     private char boardID;
@@ -28,6 +29,10 @@ public class Board {
     private TOFSensor tof1;
     private TOFSensor tof2;
 
+    // PIR Flags for simultaneous triggers
+    private int initialPIRTriggered;
+    private long initialTimePIRTriggered;
+
     // Two people
     private static long time_2P;
     private static int firstSensor_2P;
@@ -46,10 +51,12 @@ public class Board {
 
         this.logging = false;
         this.firstSensor = 0;
+        this.initialPIRTriggered = 0;
+        this.initialTimePIRTriggered = 0;
 
-        time_2P = 0;
-        firstSensor_2P = 0;
-        twoPeople = false;
+        this.time_2P = 0;
+        this.firstSensor_2P = 0;
+        this.twoPeople = false;
 
         this.packetData = ByteBuffer.allocate(18);
         this.packetData.order(ByteOrder.LITTLE_ENDIAN);
@@ -93,7 +100,15 @@ public class Board {
     // ***
 
     // PIRs
-    public void setPirTriggered(int id, short s) { pirTriggered[id-1] = s; }
+    public void setPirTriggered(int id, short s) {
+        // To check TOF data against PIR data
+        if ((pirTriggered[id-1] == 0) && (s == 1)) {
+            // means this is the first reading after being triggered
+            nonAdjSimulTriggered(id);
+        }
+
+        pirTriggered[id-1] = s;
+    }
     public int getPirTriggered(int id) { return pirTriggered[id-1]; }
 
     // TOFs
@@ -171,5 +186,44 @@ public class Board {
                 time_2P = 0;
             }
         }
+    }
+
+    public void nonAdjSimulTriggered(int pirID) {
+        // Comparing 1&5, 2&5 (non-adjacent)
+
+        // See if other boards have also been triggered
+        // within time window
+        long timeNow = new Date().getTime();
+        if (initialPIRTriggered != 0) {
+            timeNow = new Date().getTime();
+            if (initialTimePIRTriggered > timeNow - 2000) {
+                // Within time window (2 seconds)
+
+                if ((pirID == 1) || (pirID == 2)) {
+                    // Looking for 5
+                    if (initialPIRTriggered == 5) {
+                        // At least two people
+                        MainActivity.atLeastTwoPeople();
+                    }
+                }
+
+                if (pirID == 5) {
+                    // Looking for 1 or 2
+                    if ((initialPIRTriggered == 1) || (initialPIRTriggered == 2)) {
+                        // At least two people
+                        MainActivity.atLeastTwoPeople();
+                    }
+                }
+            }
+
+            // Reset
+            initialTimePIRTriggered = 0;
+            initialPIRTriggered = 0;
+
+        } else {
+            initialPIRTriggered = pirID;
+            initialTimePIRTriggered = timeNow;
+        }
+
     }
 }

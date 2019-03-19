@@ -161,7 +161,6 @@ public class MainActivity extends Activity {
 
             board.putPacketData(bytes);
 
-            int numAreasCurrentlyActive = 0;
             for (int i = 0; i < 5; i++) {
                 board.setPirTriggered(i+1, board.getPacketDataShort());
                 Log.d("PIR", (i+1) + ":  " + board.getPirTriggered(i+1));
@@ -169,12 +168,8 @@ public class MainActivity extends Activity {
                 if (board.getPirTriggered(i+1) == 1) {
                     // update the array for this minute
                     pirActivityData[i][(getCurrentMinute() % pirActivityTimeWindow)] = true;
-                    numAreasCurrentlyActive++;
                 }
             }
-
-            // Check activity level against people count
-            peopleCount = (peopleCount < numAreasCurrentlyActive) ? numAreasCurrentlyActive : peopleCount;
 
             // Update heatmap
             updateHeatMap();
@@ -183,6 +178,7 @@ public class MainActivity extends Activity {
                 if (windowReached) {
 
                     // If no activity at all, reset people counter to 0
+                    // TODO increase time window
                     int totalActivityLevel = 0;
                     for (Boolean[] b : pirActivityData) {
                         totalActivityLevel += getActivityLevel(b);
@@ -225,8 +221,6 @@ public class MainActivity extends Activity {
         peopleCount += numPeople;
         Log.d("TOF_READING", "Person enters. People count: " + peopleCount);
 
-//        occupancyNumberView.setText("" + peopleCount);
-
         // Send data to cloud
         Log.d("CLOUD", "Sending TOF data to cloud");
         handler.post(sendPeopleCount);
@@ -235,8 +229,6 @@ public class MainActivity extends Activity {
     public static void personExits(int numPeople) {
         peopleCount = (peopleCount-numPeople < 0) ? 0 : peopleCount-numPeople;
         Log.d("TOF_READING", "Person exits. People count: " + peopleCount);
-
-//        occupancyNumberView.setText("" + peopleCount);
 
         // Send data to cloud
         Log.d("CLOUD", "Sending TOF data to cloud");
@@ -369,6 +361,13 @@ public class MainActivity extends Activity {
             case 9: return ContextCompat.getColor(this, R.color.activity9);
         }
         return R.color.activity9;
+    }
+
+    // Checking TOF data against PIR data
+    public static void atLeastTwoPeople() {
+        if (peopleCount < 2) {
+            peopleCount = 2;
+        }
     }
 
 }
