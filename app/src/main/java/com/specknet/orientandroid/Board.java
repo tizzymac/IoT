@@ -1,6 +1,7 @@
 package com.specknet.orientandroid;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleDevice;
@@ -85,8 +86,8 @@ public class Board {
     // ***
 
     // PIRs
-    public void setPirTriggered(int id, short s) { pirTriggered[id] = s; }
-    public int getPirTriggered(int id) { return pirTriggered[id]; }
+    public void setPirTriggered(int id, short s) { pirTriggered[id-1] = s; }
+    public int getPirTriggered(int id) { return pirTriggered[id-1]; }
     // ***
 
     // TOFs
@@ -98,10 +99,12 @@ public class Board {
     }
     public void personPassed(int boardID) {
         // Find direction
+        Log.d("TOF_READING", "firstSensor: " + firstSensor);
 
         if (boardID == 1) {
             if (firstSensor == 2) {
                 // Count a person!
+
                 MainActivity.personEnters();
                 firstSensor = 0;
             } else {

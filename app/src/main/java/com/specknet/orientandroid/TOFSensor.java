@@ -12,18 +12,24 @@ public class TOFSensor {
     private int tofTriggered;  // value of latest reading
 
     // Variables for counting a person passing
-    private List<Integer> fiveUnder400;
-    private List<Integer> threeOver800;
+    private List<Integer> mUnderX;
+    private List<Integer> nOverY;
+
+    // Thresholds
+    int X = 500;
+    int Y = 800;
+    int m = 2;
+    int n = 3;
 
     // People counting flags
-    AtomicBoolean under400 = new AtomicBoolean(false);
-    AtomicBoolean over800 = new AtomicBoolean(false);
+    AtomicBoolean underX = new AtomicBoolean(false);
+    AtomicBoolean overY = new AtomicBoolean(false);
 
     public TOFSensor(int id) {
         this.id = id;
 
-        this.fiveUnder400 = new ArrayList<>();
-        this.threeOver800 = new ArrayList<>();
+        this.mUnderX = new ArrayList<>();
+        this.nOverY = new ArrayList<>();
     }
 
     public void setTofTriggered(int t) {
@@ -36,62 +42,63 @@ public class TOFSensor {
 
     public void processReading(int reading) {
         Log.d("TOF_READING_"+id, "" + reading);
-        if (under400.get()) {
+        if (underX.get()) {
 
-            if (over800.get()) {
+            if (overY.get()) {
 
-                // Looking for readings over 800, smaller reading found
-                if ((reading < 800)) {
+                // Looking for readings over Y, smaller reading found
+                if ((reading < Y)) {
                     // person not counted
                     // reset
                     resetFiveList();
                     resetThreeList();
-                    over800.set(false);
-                    under400.set(false);
+                    overY.set(false);
+                    underX.set(false);
                 }
 
-                // Looking for readings over 800, reading found
-                if ((reading > 800) && (getThreeSize() < 3)) {
+                // Looking for readings over Y, reading found
+                if ((reading > Y) && (getThreeSize() < n)) {
                     addThreeReading();
                 }
 
-                // Just need one more reading over 800
-                if ((reading > 800) && (getThreeSize() >= 3)) {
+                // Just need one more reading over Y
+                if ((reading > Y) && (getThreeSize() >= n)) {
 
                     // Find direction
+                    Log.d("TOF_READING_"+id, "Person seen!");
                     MainActivity.board_T_TOF.personPassed(id);
 
                     // reset
                     resetFiveList();
                     resetThreeList();
-                    over800.set(false);
-                    under400.set(false);
+                    overY.set(false);
+                    underX.set(false);
                 }
             } else {
 
-                // Adding readings under 400
-                if ((getTofTriggered() < 400) && (getFiveSize() < 4)) {
+                // Adding readings under X
+                if ((getTofTriggered() < X) && (getFiveSize() < m-1)) {
                     addFiveReading();
                 }
 
-                // Looking for readings under 500 but larger reading seen -> reset
-                if ((getTofTriggered() > 800) && (getFiveSize() < 4)) {
-                    under400.set(false);
+                // Looking for readings under X but larger reading seen -> reset
+                if ((getTofTriggered() > Y) && (getFiveSize() < m-1)) {
+                    underX.set(false);
                     resetFiveList();
                 }
 
-                // After 5 readings under 400 reached, reading over 800 seen
-                if ((getFiveSize() >= 4) && (getTofTriggered() > 800)) {
+                // After m readings under X reached, reading over Y seen
+                if ((getFiveSize() >= m-1) && (getTofTriggered() > Y)) {
                     // switch to counting threes
-                    over800.set(true);
+                    overY.set(true);
                     addThreeReading();
                 }
             }
 
         } else {
             // initial
-            if ((getTofTriggered() < 400) && (getFiveSize() == 0)) {
-                under400.set(true);
+            if ((getTofTriggered() < X) && (getFiveSize() == 0)) {
+                underX.set(true);
                 addFiveReading();
             }
         }
@@ -99,21 +106,21 @@ public class TOFSensor {
 
     // Helper methods for calculating if a person passes
     public void resetFiveList() {
-        this.fiveUnder400 = new ArrayList<>();
+        this.mUnderX = new ArrayList<>();
     }
     public void addFiveReading() {
-        fiveUnder400.add(tofTriggered);
+        mUnderX.add(tofTriggered);
     }
     public int getFiveSize() {
-        return fiveUnder400.size();
+        return mUnderX.size();
     }
     public void resetThreeList() {
-        this.threeOver800 = new ArrayList<>();
+        this.nOverY = new ArrayList<>();
     }
     public void addThreeReading() {
-        threeOver800.add(tofTriggered);
+        nOverY.add(tofTriggered);
     }
     public int getThreeSize() {
-        return threeOver800.size();
+        return nOverY.size();
     }
 }

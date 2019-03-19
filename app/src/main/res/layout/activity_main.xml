@@ -15,9 +15,9 @@
         android:fontFamily="@font/faster_one"
         android:text="People in Room:"
         android:textAlignment="center"
-        android:textColor="#090809"
-        android:textSize="50sp"
-        android:layout_margin="25dp"/>
+        android:textColor="#FFFFFF"
+        android:textSize="40sp"
+        android:layout_margin="15dp"/>
 
     <TextView
         android:id="@+id/numberView"
@@ -25,18 +25,76 @@
         android:layout_height="wrap_content"
         android:text="0"
         android:textAlignment="center"
-        android:textColor="#090809"
-        android:textSize="80sp"
-        android:layout_margin="20dp"/>
+        android:textColor="#FFFFFF"
+        android:textSize="75sp"
+        android:layout_marginBottom="15dp"/>
 
     <TextView
-        android:id="@+id/numberView2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="0"
+        android:text="Activity Heatmap:"
+        android:textColor="#FFFFFF"
+        android:textSize="40sp"
         android:textAlignment="center"
-        android:textColor="#090809"
-        android:textSize="80sp"
-        android:layout_margin="20dp"/>
+        android:layout_marginBottom="15dp"/>
+
+    <!-- Activity Heatmap -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_gravity="center"
+        android:layout_marginLeft="50dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/area1"
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@color/activity0"/>
+            <Button
+                android:id="@+id/area2"
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@color/activity0"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/area3"
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@color/activity0"/>
+            <Button
+                android:id="@+id/area4"
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@color/activity0"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@android:color/transparent"/>
+
+            <Button
+                android:id="@+id/area5"
+                android:layout_width="100dp"
+                android:layout_height="70dp"
+                android:background="@color/activity0"/>
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

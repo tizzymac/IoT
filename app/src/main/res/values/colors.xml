@@ -3,4 +3,17 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
+
+    <!-- Heatmap -->
+    <color name="activity0">#5EDA8E</color>
+    <color name="activity1">#5FD831</color>
+    <color name="activity2">#9CDC35</color>
+    <color name="activity3">#BADD38</color>
+    <color name="activity4">#DADE3A</color>
+    <color name="activity5">#D8C238</color>
+    <color name="activity6">#D47E2C</color>
+    <color name="activity7">#D15A28</color>
+    <color name="activity8">#CE3823</color>
+    <color name="activity9">#C72522</color>
+
 </resources>

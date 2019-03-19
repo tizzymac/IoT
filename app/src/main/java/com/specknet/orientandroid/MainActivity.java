@@ -5,7 +5,9 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,7 +42,13 @@ public class MainActivity extends Activity {
 
     private Context ctx;
     private static TextView occupancyNumberView;
-    private static TextView occupancyNumberView2;
+
+    // Heatmap
+    private Button area1;
+    private Button area2;
+    private Button area3;
+    private Button area4;
+    private Button area5;
 
     // Boards
     static Board board_N_PIR;   // Natasa's board
@@ -49,9 +57,10 @@ public class MainActivity extends Activity {
     private static int peopleCount;
 
     // Activity data from PIRs
-    private Boolean[] pir1ActivityData = new Boolean[60];
-    private Boolean[] pir2ActivityData = new Boolean[60];
-    private Boolean[] pir3ActivityData = new Boolean[60];
+    private Boolean[] pir1ActivityData = new Boolean[20];
+    private Boolean[] pir2ActivityData = new Boolean[20];
+    private Boolean[] pir3ActivityData = new Boolean[20];
+    private Boolean windowReached;
 
     // IoT Core
     private static IotCoreCommunicator communicator;
@@ -64,15 +73,24 @@ public class MainActivity extends Activity {
         ctx = this;
 
         occupancyNumberView = findViewById(R.id.numberView);
-        occupancyNumberView2 = findViewById(R.id.numberView2);
         peopleCount = 0;
+
+        // Activity levels
         Arrays.fill(pir1ActivityData, Boolean.FALSE);
         Arrays.fill(pir2ActivityData, Boolean.FALSE);
+        Arrays.fill(pir3ActivityData, Boolean.FALSE);
+
+        // Heatmap
+        area1 = findViewById(R.id.area1);
+        area2 = findViewById(R.id.area2);
+        area3 = findViewById(R.id.area3);
+        area4 = findViewById(R.id.area4);
+        area5 = findViewById(R.id.area5);
 
         // Assumes this board used for PIRs
-//        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
-//        connectToOrient(board_N_PIR);
-//        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
+        board_N_PIR = new Board(ctx, ORIENT_BLE_ADDRESS_n, 'n');
+        connectToOrient(board_N_PIR);
+        Toast.makeText(ctx, "Connecting to n", Toast.LENGTH_SHORT).show();
 
         // Assumes this board used for TOFs
         board_T_TOF = new Board(ctx, ORIENT_BLE_ADDRESS_t, 't');
@@ -94,8 +112,6 @@ public class MainActivity extends Activity {
         handler.post(connectOffTheMainThread); // Use whatever threading mechanism you want
 
         // TODO: People count need to be read in from cloud at start?
-
-        // TODO: catch BleDisconnectedException
     }
 
     private void connectToOrient(Board board) {
@@ -141,93 +157,102 @@ public class MainActivity extends Activity {
                             // Handle an error here.
                             Log.e("OrientAndroid", "Error: " + throwable.toString());
 
-
                         }
                 );
     }
 
     private void handleRawPIRPacket(final byte[] bytes, Board board) {
+        if (board.getBoardID() == 'n') {
 
-        board.putPacketData(bytes);
+            board.putPacketData(bytes);
 
-        // assumes order always the same
-        board.setPirTriggered(1, board.getPacketDataShort());
-        board.setPirTriggered(2, board.getPacketDataShort());
-        board.setPirTriggered(3, board.getPacketDataShort());
+            // assumes order always the same
+            board.setPirTriggered(1, board.getPacketDataShort());
+            board.setPirTriggered(2, board.getPacketDataShort());
+            board.setPirTriggered(3, board.getPacketDataShort());
 
-        if (board.isLogging()) {
+            // PIR
+            Log.d("PIR", "1:  " + board.getPirTriggered(1));
+            Log.d("PIR", "2:  " + board.getPirTriggered(2));
+            Log.d("PIR", "3:  " + board.getPirTriggered(3));
 
-            if (board.getCounter() % 1 == 0) {
-                runOnUiThread(() -> {
+            if (board.getPirTriggered(1) == 1) {
+                // update the array for this minute
+                pir1ActivityData[(getCurrentMinute()%20)] = true;
+            }
+            Log.d("PIR", "Activity 1:" + getActivityLevel(pir1ActivityData));
 
-                    // PIR
-                    Log.d("PIR", "1:  " + board.getPirTriggered(1));
-                    Log.d("PIR", "2:  " + board.getPirTriggered(2));
-                    Log.d("PIR", "3:  " + board.getPirTriggered(3));
+            if (board.getPirTriggered(2) == 1) {
+                // update the array for this minute
+                pir2ActivityData[(getCurrentMinute()%20)] = true;
+            }
+            Log.d("PIR", "Activity 2:" + getActivityLevel(pir2ActivityData));
 
-                    if (board.getPirTriggered(1) == 1) {
-                        // update the array for this minute
-                        pir1ActivityData[getCurrentMinute()] = true;
-                    }
-                    if (board.getPirTriggered(2) == 1) {
-                        // update the array for this minute
-                        pir2ActivityData[getCurrentMinute()] = true;
-                    }
-                    if (board.getPirTriggered(3) == 1) {
-                        // update the array for this minute
-                        pir3ActivityData[getCurrentMinute()] = true;
-                    }
+            if (board.getPirTriggered(3) == 1) {
+                // update the array for this minute
+                pir3ActivityData[(getCurrentMinute()%20)] = true;
+            }
+            Log.d("PIR", "Activity 3:" + getActivityLevel(pir3ActivityData));
 
-                    if (getCurrentMinute() == 59) {
-                        // send this hour's data to cloud
-                        handler.post(sendPIRData);
+            // update heatmap
+            updateHeatMap();
 
-                        // reset array
-                        Arrays.fill(pir1ActivityData, Boolean.FALSE);
-                        Arrays.fill(pir2ActivityData, Boolean.FALSE);
-                        Arrays.fill(pir3ActivityData, Boolean.FALSE);
-                    }
-                });
+            // Window size: 20 mins
+            if ((getCurrentMinute()%20) == 0) {
+                if (windowReached) {
+
+                    // send this time window's data to cloud
+                    Log.d("CLOUD", "Sending PIR data to cloud");
+                    handler.post(sendPIRData);
+
+                    // reset array
+                    Arrays.fill(pir1ActivityData, Boolean.FALSE);
+                    Arrays.fill(pir2ActivityData, Boolean.FALSE);
+                    Arrays.fill(pir3ActivityData, Boolean.FALSE);
+                }
+                windowReached = false;
+            }
+            if (((getCurrentMinute()%20) == 19)) {
+                windowReached = true;
             }
         }
     }
 
     private void handleRawTOFPacket(final byte[] bytes, Board board) {
+        if (board.getBoardID() == 't') {
 
-        board.putPacketData(bytes);
+            board.putPacketData(bytes);
 
-        // Assumes order is correct
-        board.tofTriggered(1, board.getPacketDataInt());
-        board.tofTriggered(2, board.getPacketDataInt());
+            // Assumes order is correct
+            board.tofTriggered(1, board.getPacketDataInt());
+            board.tofTriggered(2, board.getPacketDataInt());
 
-        // TODO: Delete this?
-//        if (board.isLogging()) {
-//
-//            if (board.getCounter() % 1 == 0) {
-//                runOnUiThread(() -> {
-//                    // Do we even need this?
-//                });
-//            }
-//            board.increaseCounter();
-//        }
+            runOnUiThread(() -> {
+                occupancyNumberView.setText("" + peopleCount);
+            });
+        }
     }
 
     public static void personEnters() {
         peopleCount++;
-        occupancyNumberView.setText("" + peopleCount);
-        occupancyNumberView2.setText("in");
+        Log.d("TOF_READING", "Person enters. People count: " + peopleCount);
+
+//        occupancyNumberView.setText("" + peopleCount);
 
         // Send data to cloud
-        //handler.post(updatePeopleCount);
+        Log.d("CLOUD", "Sending TOF data to cloud");
+        handler.post(sendPeopleCount);
     }
 
     public static void personExits() {
         peopleCount--;
-        occupancyNumberView.setText("" + peopleCount);
-        occupancyNumberView2.setText("out");
+        Log.d("TOF_READING", "Person enters. People count: " + peopleCount);
+
+//        occupancyNumberView.setText("" + peopleCount);
 
         // Send data to cloud
-        //handler.post(updatePeopleCount);
+        Log.d("CLOUD", "Sending TOF data to cloud");
+        handler.post(sendPeopleCount);
     }
 
     /* IoT Core bits */
@@ -242,32 +267,13 @@ public class MainActivity extends Activity {
     private final Runnable sendPIRData = new Runnable() {
         @Override
         public void run() {
-            // Get activity level
-            int activeMins1 = 0;
-            for (Boolean b : pir1ActivityData) {
-                if (b) {
-                    activeMins1++;
-                }
-            }
-            int activeMins2 = 0;
-            for (Boolean b : pir2ActivityData) {
-                if (b) {
-                    activeMins2++;
-                }
-            }
-            int activeMins3 = 0;
-            for (Boolean b : pir3ActivityData) {
-                if (b) {
-                    activeMins3++;
-                }
-            }
             try {
                 String subtopic = "events/pir";
                 String messageJSON = new JSONObject()
                         .put("Timestamp", new Date().getTime())
-                        .put("PIR1Activity", activeMins1)
-                        .put("PIR2Activity", activeMins2)
-                        .put("PIR3Activity", activeMins3)
+                        .put("PIR1Activity", getActivityLevel(pir1ActivityData))
+                        //.put("PIR2Activity", getActivityLevel(pir2ActivityData))
+                        .put("PIR3Activity", getActivityLevel(pir3ActivityData))
                         .toString();
                 communicator.publishMessage(subtopic, messageJSON);
             } catch (JSONException e) {
@@ -277,7 +283,7 @@ public class MainActivity extends Activity {
         }
     };
 
-    private static final Runnable updatePeopleCount = new Runnable() {
+    private static final Runnable sendPeopleCount = new Runnable() {
         @Override
         public void run() {
             try {
@@ -336,5 +342,41 @@ public class MainActivity extends Activity {
         return calendar.get(Calendar.MINUTE);
     }
 
+    // PIR Activity
+    private void updateHeatMap() {
+        runOnUiThread(() -> {
+            area1.setBackgroundColor(getActivityColor(getActivityLevel(pir1ActivityData)));
+            area2.setBackgroundColor(getActivityColor(getActivityLevel(pir2ActivityData)));
+            area3.setBackgroundColor(getActivityColor(getActivityLevel(pir3ActivityData)));
+
+        });
+    }
+
+    private int getActivityLevel(Boolean[] activityData) {
+        int activeMins = 0;
+        for (Boolean b : activityData) {
+            if (b) {
+                activeMins++;
+            }
+        }
+        return activeMins;
+    }
+
+    private int getActivityColor(int activityLevel) {
+        int a = activityLevel/2;
+        switch (a) {
+            case 0: return ContextCompat.getColor(this, R.color.activity0);
+            case 1: return ContextCompat.getColor(this, R.color.activity1);
+            case 2: return ContextCompat.getColor(this, R.color.activity2);
+            case 3: return ContextCompat.getColor(this, R.color.activity3);
+            case 4: return ContextCompat.getColor(this, R.color.activity4);
+            case 5: return ContextCompat.getColor(this, R.color.activity5);
+            case 6: return ContextCompat.getColor(this, R.color.activity6);
+            case 7: return ContextCompat.getColor(this, R.color.activity7);
+            case 8: return ContextCompat.getColor(this, R.color.activity8);
+            case 9: return ContextCompat.getColor(this, R.color.activity9);
+        }
+        return R.color.activity9;
+    }
 
 }
